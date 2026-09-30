@@ -1,0 +1,7 @@
+- [] Remover artigos da wikipedia que são listas
+- [] Ler manuskript do DW Top-Thema
+- [] Burlar paywall para noticias via rss feed
+- [] Resolver notação matematica (sugestão: mathML)
+- [] Capas terem um tema por mês, talvez mudar o algoritmo
+- [] No mês os artigos da wikipedia seguirem um caminho
+- [] Buscar artigos que tem relação com algum dos ultimos filmes vistos (usar letterboxd rss feed -> ordenar por nota; coração)
