@@ -1,10 +1,11 @@
-# Configuração do Jornal Semanal — Semana 1 (só Wikipedia)
-
+# Configuração do Jornal Semanal — Semana 1 (só Wikipedia + capa generativa)
+ 
 saida: ./saida            # Na Semana 3 troque por ~/biblioteca-opds
-titulo: Jornal Semanal
+titulo: Jornal Semanal    # PROVISÓRIO — aparece na capa e nos metadados; trocar aqui muda tudo (não afeta o desenho da capa)
 autor: Jornal Semanal
 idioma: pt
-
+primeira_edicao: 2026-10-02   # data da edição nº 1; a capa mostra "Nº N" (semanas desde esta data + 1). Apague a linha para omitir o número.
+ 
 wikipedia:
   api: https://pt.wikipedia.org/w/api.php
   profundidade_max: 3     # quantos níveis de subcategoria descer

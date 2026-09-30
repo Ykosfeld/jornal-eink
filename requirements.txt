@@ -3,3 +3,5 @@ pyyaml
 beautifulsoup4
 lxml
 ebooklib
+Pillow
+numpy

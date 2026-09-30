@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Gerador do Jornal Semanal (.epub) — Semana 1: apenas seção Curiosidades (Wikipedia)."""
+"""Gerador do Jornal Semanal (.epub) — Semana 1: seção Curiosidades (Wikipedia) + capa generativa."""
 import argparse
 import datetime as dt
 import html
@@ -15,9 +15,11 @@ from bs4 import BeautifulSoup
 from PIL import Image, ImageOps
 from ebooklib import epub
 
+from capa import gerar_capa, html_controle
+
 HEADERS = {
     # A Wikimedia exige um User-Agent identificável. Troque pelo seu contato.
-    "User-Agent": "JornalSemanalEink/0.1 (projeto pessoal; contato: seu-email@exemplo.com)"
+    "User-Agent": "JornalSemanalEink/0.1 (projeto pessoal; contato: yuri.kosfeld@gmail.com)"
 }
 
 SECOES_IGNORADAS = {
@@ -36,8 +38,11 @@ p { text-align: justify; margin: 0.5em 0; }
 .fonte { font-size: 0.8em; margin-top: 2em; border-top: 1px solid #000; padding-top: 0.5em; }
 img { max-width: 100%; height: auto; }
 .imagem { text-align: center; margin: 0.6em 0; }
-.capa { text-align: center; margin-top: 30%; }
-.capa h1 { font-size: 2.2em; }
+.capa { text-align: center; margin: 0; padding: 0; }
+.capa img { width: 100%; height: auto; max-height: 100%; }
+table { font-size: 0.85em; border-collapse: collapse; margin: 0.8em 0; }
+td { padding: 0.2em 1em 0.2em 0; vertical-align: top; }
+small { font-size: 0.8em; }
 """
 
 
@@ -182,7 +187,8 @@ def capitulo(arquivo, titulo, corpo, css):
     return c
 
 
-def montar_epub(cfg, artigos, data, destino):
+def montar_epub(cfg, artigos, data, destino, numero_edicao=None):
+    """Monta o epub. Devolve o `info` da capa (semente, níveis etc.) para log."""
     livro = epub.EpubBook()
     livro.set_identifier(f"jornal-{data.isoformat()}")
     livro.set_title(f"{cfg['titulo']} — {data.strftime('%d/%m/%Y')}")
@@ -192,9 +198,13 @@ def montar_epub(cfg, artigos, data, destino):
     css = epub.EpubItem(uid="estilo", file_name="estilo.css", media_type="text/css", content=CSS)
     livro.add_item(css)
 
+    # Capa generativa: a semente sai dos pageids dos artigos + data.
+    png_capa, info_capa = gerar_capa(cfg["titulo"], data, [a["pageid"] for _, a in artigos],
+                                     numero_edicao)
+    livro.set_cover("capa.png", png_capa, create_page=False)   # capa dos metadados (biblioteca do X4)
     capa = capitulo("capa.xhtml", "Capa",
-                    f'<div class="capa"><h1>{html.escape(cfg["titulo"])}</h1>'
-                    f'<p>{data.strftime("%d/%m/%Y")}</p></div>', css)
+                    f'<div class="capa"><img src="capa.png" alt="{html.escape(cfg["titulo"], quote=True)}"/></div>',
+                    css)
     livro.add_item(capa)
 
     caps = []
@@ -218,13 +228,20 @@ def montar_epub(cfg, artigos, data, destino):
         livro.add_item(c)
         caps.append(c)
 
-    livro.toc = [capa, (epub.Section("Curiosidades"), caps)]
+    # Última página: dados de controle da capa (semente, níveis...) só para curiosidade/depuração.
+    controle = capitulo("controle.xhtml", "Nota de controle",
+                        html_controle(info_capa, [(t, a["titulo"], a["pageid"]) for t, a in artigos]),
+                        css)
+    livro.add_item(controle)
+
+    livro.toc = [capa, (epub.Section("Curiosidades"), caps), controle]
     livro.add_item(epub.EpubNcx())
     livro.add_item(epub.EpubNav())
-    livro.spine = ["nav", capa] + caps
+    livro.spine = [capa, "nav"] + caps + [controle]
 
     destino.parent.mkdir(parents=True, exist_ok=True)
     epub.write_epub(str(destino), livro)
+    return info_capa
 
 
 # ---------------------------------------------------------------- Histórico
@@ -254,6 +271,16 @@ def salvar_historico(caminho, registros):
     tmp = caminho.with_suffix(".tmp")
     tmp.write_text(json.dumps(registros, ensure_ascii=False, indent=1), encoding="utf-8")
     tmp.replace(caminho)
+
+
+def numero_da_edicao(cfg, hoje):
+    """Nº da edição = semanas desde `primeira_edicao` (config) + 1. Sem estado; None se não configurado."""
+    primeira = cfg.get("primeira_edicao")
+    if isinstance(primeira, str):
+        primeira = dt.date.fromisoformat(primeira)
+    if not primeira or hoje < primeira:
+        return None
+    return (hoje - primeira).days // 7 + 1
 
 
 # ---------------------------------------------------------------- CLI
@@ -331,10 +358,12 @@ def main():
         sys.exit("Nenhum artigo obtido; epub não gerado.")
 
     destino = Path(cfg["saida"]).expanduser() / f"jornal_{hoje.isoformat()}.epub"
-    montar_epub(cfg, artigos, hoje, destino)
+    info_capa = montar_epub(cfg, artigos, hoje, destino, numero_da_edicao(cfg, hoje))
     if usar_hist:
         salvar_historico(caminho_hist, registros + novos)   # só depois do epub gerado com sucesso
     print(f"\nEpub gerado: {destino}  ({len(artigos)} artigos)")
+    print(f"Capa: semente {info_capa['semente']}, {info_capa['niveis']} níveis, "
+          f"{info_capa['faixas_cinza']} faixas de cinza")
     if pulados:
         print("ATENÇÃO — temas sem artigo nesta edição: " + ", ".join(pulados)
               + "\n  (categorias esgotadas ou falha de rede; considere adicionar mais raízes no config.yaml)")
