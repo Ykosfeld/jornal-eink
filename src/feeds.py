@@ -7,6 +7,10 @@ import collections
 import datetime as dt
 import xml.etree.ElementTree as ET
 
+from urllib.parse import urlsplit, urlunsplit
+import html
+import json
+import re
 import feedparser
 from bs4 import BeautifulSoup
 from readability import Document
@@ -24,6 +28,8 @@ PADRAO = {
     "max_caracteres": 8000,
     "min_caracteres": 500,  # abaixo disso tenta o resumo do feed e usa o mais longo
     "lang": "pt",
+    "sufixo_url": None,     # ex.: "lm" -> tenta primeiro <url-do-item>/lm/ (DW: manuscrito)
+    "extrator": None,       # "dw" = lê o manuscrito do JSON embutido em vez de usar o readability
 }
 
 
@@ -107,19 +113,110 @@ def limpar_generico(fragmento, max_chars):
     return "\n".join(h for _, h in saida), total
 
 
+def url_com_sufixo(url, sufixo):
+    """'.../l-123' + 'lm' -> '.../l-123/lm' (sem barra final; ignora query/fragmento; não duplica)."""
+    p = urlsplit(url)
+    sufixo = sufixo.strip("/")
+    caminho = p.path.rstrip("/")
+    if not caminho.endswith("/" + sufixo):
+        caminho += "/" + sufixo
+    return urlunsplit((p.scheme, p.netloc, caminho, "", ""))
+
+
+def _extrair_pagina(sessao, url, max_chars):
+    r = sessao.get(url, timeout=30)
+    r.raise_for_status()
+    return limpar_generico(Document(r.text).summary(html_partial=True), max_chars)
+
+_APOLLO = "window.__APOLLO_STATE__="
+
+
+def _vocabulario_dw(estado, licao, manuscrito):
+    """Glossário da lição: [(palavra, definição)]. A palavra vem do próprio registro `Knowledge`
+    (campo name/title) ou, se não houver, do `data-title` marcado no manuscrito."""
+    marcadas = []
+    for s in BeautifulSoup(manuscrito, "lxml").select("span[data-title]"):
+        t = s["data-title"].strip()
+        if t and t not in marcadas:
+            marcadas.append(t)
+
+    refs = [r["__ref"] for r in licao.get("knowledges") or [] if isinstance(r, dict) and "__ref" in r]
+    if not refs:   # plano B: todos os Knowledge do estado
+        refs = [k for k in estado if k.startswith("Knowledge:")]
+
+    itens = []
+    for chave in refs:
+        k = estado.get(chave) or {}
+        definicao = " ".join(BeautifulSoup(k.get("text") or "", "lxml").get_text(" ").split())
+        palavra = (k.get("name") or k.get("title") or "").strip()
+        if definicao or palavra:
+            itens.append([palavra, definicao])
+
+    # sem nome no registro: usa os data-title, só se a contagem bater (senão o pareamento seria chute)
+    if itens and not any(p for p, _ in itens) and len(itens) == len(marcadas):
+        for item, titulo in zip(itens, marcadas):
+            item[0] = titulo
+    return itens
+
+
+def _html_vocabulario(itens):
+    if not itens:
+        return ""
+    li = "".join(
+        "<li>" + (f"<b>{html.escape(p)}</b>" if p else "")
+        + (" — " if p and d else "") + html.escape(d) + "</li>"
+        for p, d in itens)
+    return f"<h2>Vokabeln</h2><ul>{li}</ul>"
+
+
+def _manuscrito_dw(sessao, url, max_chars):
+    """learngerman.dw.com é um app React: o texto vem no JSON embutido (__APOLLO_STATE__)."""
+    m = re.search(r"/l-(\d+)", url)
+    if not m:
+        return "", 0
+    r = sessao.get(url, timeout=30)
+    r.raise_for_status()
+    i = r.text.find(_APOLLO)
+    if i < 0:
+        return "", 0
+    estado, _ = json.JSONDecoder().raw_decode(r.text[i + len(_APOLLO):])
+    licao = estado.get(f"Lesson:{m.group(1)}") or {}
+    manuscrito = licao.get("manuscript") or ""
+    corpo, total = limpar_generico(manuscrito, max_chars)
+    if total:
+        vocab = _vocabulario_dw(estado, licao, manuscrito)
+        print(f"    vocabulário: {len(vocab)} entrada(s)")
+        corpo += "\n" + _html_vocabulario(vocab)
+    return corpo, total
+
 def obter_item(sessao, entrada, nome, cfg):
     """Baixa a página da entrada e extrai o texto; se falhar/curto, usa o que o feed trouxe."""
     url = entrada.get("link")
     titulo = (entrada.get("title") or "").strip()
     if not url or not titulo:
         return None
+
+    # Candidatas em ordem de preferência: versão com sufixo (manuscrito), depois a página original.
+    candidatas = []
+    if cfg.get("sufixo_url"):
+        candidatas.append(url_com_sufixo(url, cfg["sufixo_url"]))
+    candidatas.append(url)
+
+    extrair = _manuscrito_dw if cfg.get("extrator") == "dw" else _extrair_pagina
+
     corpo, total = "", 0
-    try:
-        r = sessao.get(url, timeout=30)
-        r.raise_for_status()
-        corpo, total = limpar_generico(Document(r.text).summary(html_partial=True), cfg["max_caracteres"])
-    except Exception:  # noqa: BLE001 — cai no resumo do feed
-        pass
+    for u in candidatas:
+        try:
+            c, t = extrair(sessao, u, cfg["max_caracteres"])
+            print(f"    tentou {u} -> {t} chars")
+        except Exception as e:  # noqa: BLE001 — tenta a próxima
+            print(f"    tentou {u} -> falhou ({e})")
+            continue
+        if t > total:
+            corpo, total = c, t
+        if total >= cfg["min_caracteres"]:
+            break
+
     if total < cfg["min_caracteres"]:
         c2, t2 = limpar_generico(texto_da_entrada(entrada), cfg["max_caracteres"])
         if t2 > total:

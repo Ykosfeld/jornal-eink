@@ -123,7 +123,8 @@ noticias:
 # Alemão: seção "Deutsch üben"
 dw:
   ativar: true
-  feed: http://rss.dw-world.de/xml/DKpodcast_topthemamitvokabeln_de   # confira com --validar-feeds
+  feed: http://rss.dw-world.de/xml/DKpodcast_topthemamitvokabeln_de
   quantidade: 3
-  dias: 14              # janela maior: o feed não publica em dia fixo
+  dias: 14
   max_caracteres: 12000
+  sufixo_url: lm       # manuscrito do áudio; apague a linha para voltar ao comportamento antigo

@@ -66,6 +66,8 @@ def coletar_secao_dw(sessao, cfg, usados_urls, agora):
         "por_feed": dcfg.get("quantidade", 3), "max_total": dcfg.get("quantidade", 3),
         "dias": dcfg.get("dias", 14), "max_caracteres": dcfg.get("max_caracteres", 12000),
         "min_caracteres": dcfg.get("min_caracteres", 800), "lang": "de",
+        "sufixo_url": dcfg.get("sufixo_url"),
+        "extrator": "dw",
     }, usados_urls, agora)
 
 
