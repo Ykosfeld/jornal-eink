@@ -3,6 +3,7 @@
 import argparse
 import datetime as dt
 import html
+import io
 import random
 import sys
 from pathlib import Path
@@ -10,11 +11,12 @@ from pathlib import Path
 import requests
 import yaml
 from bs4 import BeautifulSoup
+from PIL import Image, ImageOps
 from ebooklib import epub
 
 HEADERS = {
     # A Wikimedia exige um User-Agent identificável. Troque pelo seu contato.
-    "User-Agent": "JornalSemanalEink/0.1 (projeto pessoal; contato: yuri.kosfeld@gmail.com)"
+    "User-Agent": "JornalSemanalEink/0.1 (projeto pessoal; contato: seu-email@exemplo.com)"
 }
 
 SECOES_IGNORADAS = {
@@ -31,6 +33,8 @@ h3 { font-size: 1.05em; }
 p { text-align: justify; margin: 0.5em 0; }
 .tema { font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.08em; }
 .fonte { font-size: 0.8em; margin-top: 2em; border-top: 1px solid #000; padding-top: 0.5em; }
+img { max-width: 100%; height: auto; }
+.imagem { text-align: center; margin: 0.6em 0; }
 .capa { text-align: center; margin-top: 30%; }
 .capa h1 { font-size: 2.2em; }
 """
@@ -95,14 +99,46 @@ def limpar_html(extrato, max_chars):
     return "\n".join(h for _, h in saida), total
 
 
+def preparar_imagem(dados, icfg):
+    """Tons de cinza + contraste + redimensionamento + JPEG, pensado para e-ink."""
+    img = Image.open(io.BytesIO(dados))
+    if img.mode in ("RGBA", "LA", "P"):
+        img = img.convert("RGBA")
+        fundo = Image.new("RGBA", img.size, (255, 255, 255, 255))
+        img = Image.alpha_composite(fundo, img)
+    img = ImageOps.autocontrast(img.convert("L"), cutoff=1)
+    img.thumbnail((icfg["largura_max"], icfg["altura_max"]), Image.LANCZOS)
+    buf = io.BytesIO()
+    img.save(buf, "JPEG", quality=icfg["qualidade_jpeg"], optimize=True)
+    return buf.getvalue()
+
+
+def baixar_imagem(sessao, pag, icfg):
+    """Baixa e prepara a imagem de destaque do artigo. Devolve None se não houver/der erro."""
+    thumb = pag.get("thumbnail")
+    if not icfg.get("ativar") or not thumb:
+        return None
+    if min(thumb.get("width", 0), thumb.get("height", 0)) < icfg["tamanho_min"]:
+        return None
+    try:
+        r = sessao.get(thumb["source"], timeout=30)
+        r.raise_for_status()
+        return {"bytes": preparar_imagem(r.content, icfg), "arquivo": pag.get("pageimage", "")}
+    except Exception:  # noqa: BLE001 — imagem é opcional, nunca derruba o artigo
+        return None
+
+
 def buscar_artigo(sessao, cfg, titulo):
-    d = api(sessao, cfg, action="query", prop="extracts|info", inprop="url",
-            titles=titulo, exlimit=1, redirects=1)
+    icfg = cfg.get("imagens", {"ativar": False})
+    d = api(sessao, cfg, action="query", prop="extracts|info|pageimages", inprop="url",
+            titles=titulo, exlimit=1, redirects=1,
+            piprop="thumbnail|name", pithumbsize=icfg.get("thumb", 800), pilicense="free")
     pag = d["query"]["pages"][0]
     if pag.get("missing") or not pag.get("extract"):
         return None
     corpo, total = limpar_html(pag["extract"], cfg["max_caracteres"])
-    return {"titulo": pag["title"], "url": pag["fullurl"], "html": corpo, "chars": total}
+    return {"titulo": pag["title"], "url": pag["fullurl"], "html": corpo, "chars": total,
+            "imagem": baixar_imagem(sessao, pag, icfg)}
 
 
 def sortear_artigo(sessao, cfg, categorias, usados, rng):
@@ -111,7 +147,7 @@ def sortear_artigo(sessao, cfg, categorias, usados, rng):
     for _ in range(cfg["tentativas"]):
         cat = rng.choice(categorias)
         caminho = [cat]
-        for nivel in range(cfg["profundidade_max"] + 1):
+        for nivel in range(cfg["profundidade_max"] + 1):    
             artigos, subs = membros(sessao, cfg, cat)
             artigos = [a for a in artigos if not a.startswith(ignorados) and a not in usados]
             if nivel == cfg["profundidade_max"] or not subs:
@@ -159,10 +195,21 @@ def montar_epub(cfg, artigos, data, destino):
 
     caps = []
     for i, (tema, art) in enumerate(artigos, 1):
+        img_html, img_credito = "", ""
+        if art.get("imagem"):
+            nome_img = f"img/cur_{i:02d}.jpg"
+            livro.add_item(epub.EpubItem(uid=f"img_{i:02d}", file_name=nome_img,
+                                         media_type="image/jpeg", content=art["imagem"]["bytes"]))
+            img_html = (f'<p class="imagem"><img src="{nome_img}" '
+                        f'alt="{html.escape(art["titulo"], quote=True)}"/></p>')
+            arq = art["imagem"]["arquivo"]
+            if arq:
+                link = "https://pt.wikipedia.org/wiki/Ficheiro:" + arq.replace(" ", "_")
+                img_credito = f' Imagem: <a href="{html.escape(link)}">página do arquivo</a> (Wikimedia).'
         corpo = (f'<p class="tema">{html.escape(tema)}</p>'
-                 f'<h1>{html.escape(art["titulo"])}</h1>{art["html"]}'
+                 f'<h1>{html.escape(art["titulo"])}</h1>{img_html}{art["html"]}'
                  f'<p class="fonte">Fonte: Wikipédia — <a href="{html.escape(art["url"])}">{html.escape(art["url"])}</a>'
-                 f' (CC BY-SA 4.0)</p>')
+                 f' (CC BY-SA 4.0).{img_credito}</p>')
         c = capitulo(f"cur_{i:02d}.xhtml", f'{tema}: {art["titulo"]}', corpo, css)
         livro.add_item(c)
         caps.append(c)
@@ -213,7 +260,7 @@ def main():
         return
 
     rng = random.Random(args.semente)
-    wcfg = cfg["wikipedia"]
+    wcfg = {**cfg["wikipedia"], "imagens": cfg.get("imagens", {"ativar": False})}
     artigos, usados = [], set()
     for tema, cats in cfg["temas"].items():
         print(f"[{tema}] sorteando...", end=" ", flush=True)
@@ -227,7 +274,8 @@ def main():
             continue
         usados.add(art["titulo"])
         artigos.append((tema, art))
-        print(f'{art["titulo"]}  ({art["caminho"]}, {art["chars"]} chars)')
+        extra = ", com imagem" if art.get("imagem") else ""
+        print(f'{art["titulo"]}  ({art["caminho"]}, {art["chars"]} chars{extra})')
 
     if not artigos:
         sys.exit("Nenhum artigo obtido; epub não gerado.")

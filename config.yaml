@@ -12,7 +12,16 @@ wikipedia:
   max_caracteres: 15000   # trunca artigos muito longos (em fim de parágrafo)
   tentativas: 8           # sorteios por tema antes de desistir
   titulos_ignorados_prefixos: ["Lista de", "Listas de", "Anexo:", "Predefinição:"]
-
+  
+# Imagem de destaque de cada artigo (só imagens de licença livre; se não houver, o artigo segue sem imagem)
+imagens:
+  ativar: true
+  thumb: 800            # largura pedida à Wikipedia (depois é reduzida)
+  largura_max: 480      # tela do X4: 480 px de largura
+  altura_max: 400       # evita imagens que ocupam a página inteira
+  qualidade_jpeg: 70
+  tamanho_min: 150      # ignora imagens em que largura ou altura < 150 px
+ 
 # Cada tema tem uma lista de categorias-raiz da pt.wikipedia (sem o prefixo "Categoria:").
 # A cada execução sorteia-se uma raiz e desce-se aleatoriamente pelas subcategorias até cair em um artigo.
 # ATENÇÃO: nomes escritos de memória — rode `python gerador_jornal.py --validar` e ajuste o que falhar.
@@ -47,6 +56,9 @@ temas:
     - Instrumentos musicais
     - Gêneros musicais
     - Teoria musical
+    - Músicos vencedores do Grammy  
+    - Cantores de rock dos Estados Unidos
+    - Cantores de rock do Reino Unido
   Música clássica:
     - Música clássica
     - Compositores clássicos do século XX
@@ -76,6 +88,8 @@ temas:
     - Cineastas premiados no Festival de Veneza
     - Cineastas dos Estados Unidos
     - Gêneros cinematográficos
+    - Atores de cinema dos Estados Unidos
+    - Atores de cinema do Reino Unido
 
 # Placeholders para as próximas semanas (ainda não usados pelo script)
 noticias: []      # Semana 2: lista de feeds RSS
