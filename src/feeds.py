@@ -6,11 +6,11 @@ Usado tanto para a seção Notícias quanto para a seção da DW (Deutsch üben)
 import collections
 import datetime as dt
 import xml.etree.ElementTree as ET
-from pathlib import Path
 
 import feedparser
 from bs4 import BeautifulSoup
 from readability import Document
+from .config import resolver_caminho
 
 TAGS_PERMITIDAS = {"p", "h2", "h3", "h4", "ul", "ol", "li", "blockquote", "b", "i", "em", "strong", "sup", "sub", "br"}
 BLOCOS = ["p", "h2", "h3", "h4", "ul", "ol", "blockquote"]
@@ -25,12 +25,6 @@ PADRAO = {
     "min_caracteres": 500,  # abaixo disso tenta o resumo do feed e usa o mais longo
     "lang": "pt",
 }
-
-
-def resolver_caminho(p):
-    """Caminho relativo é interpretado a partir da pasta do script (funciona igual no cron)."""
-    p = Path(p).expanduser()
-    return p if p.is_absolute() else Path(__file__).resolve().parent / p
 
 
 # ---------------------------------------------------------------- fontes (RSS + OPML)
