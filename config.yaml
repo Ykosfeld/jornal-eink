@@ -1,7 +1,7 @@
 # Configuração do Jornal Semanal — Semana 1 (só Wikipedia + capa generativa)
  
 saida: ./saida            # Na Semana 3 troque por ~/biblioteca-opds
-titulo: Jornal Semanal    # PROVISÓRIO — aparece na capa e nos metadados; trocar aqui muda tudo (não afeta o desenho da capa)
+titulo: Gazeta dos Gazeteiros    # PROVISÓRIO — aparece na capa e nos metadados; trocar aqui muda tudo (não afeta o desenho da capa)
 autor: Yuri Kosfeld
 idioma: pt
 primeira_edicao: 2026-10-02   # data da edição nº 1; a capa mostra "Nº N" (semanas desde esta data + 1). Apague a linha para omitir o número.
@@ -113,7 +113,6 @@ noticias:
     - {nome: "Deadline", url: "https://deadline.com/feed/"}
     - {nome: "IndieWire", url: "https://www.indiewire.com/feed"}
     - {nome: "Variety", url: "https://variety.com/feed/"}
-    - {nome: "60-Second Science", url: "http://rss.sciam.com/sciam/60secsciencepodcast"}
     - {nome: "Jason Schreier", url: "https://www.bloomberg.com/authors/AUvqMRVAZCw/jason-schreier.rss"}
     # - {nome: "Exemplo", url: "https://exemplo.com/feed.xml"}
     # - "https://outro.com/rss"          # sem nome: usa o título do feed
