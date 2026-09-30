@@ -5,3 +5,6 @@
 - [] Capas terem um tema por mês, talvez mudar o algoritmo
 - [] No mês os artigos da wikipedia seguirem um caminho
 - [] Buscar artigos que tem relação com algum dos ultimos filmes vistos (usar letterboxd rss feed -> ordenar por nota; coração)
+- [] Formatar e dar mais cara de jornal
+- [] Colocar a opção de pegar um artigo da wikipedia selecionado manualmente e chama-lo de escolha do editor
+- [] Obituario, feriados, e coisas legais da "pagina inicial" da wikipedia
