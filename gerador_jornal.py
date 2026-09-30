@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Gerador do Jornal Semanal (.epub) — Semana 1: seção Curiosidades (Wikipedia) + capa generativa."""
+"""Gerador do Jornal Semanal (.epub) — Semanas 1-2: Notícias + Curiosidades (Wikipedia) + Deutsch üben (DW) + capa generativa."""
 import argparse
 import datetime as dt
 import html
@@ -16,6 +16,7 @@ from PIL import Image, ImageOps
 from ebooklib import epub
 
 from capa import gerar_capa, html_controle
+from feeds import coletar_noticias, validar_feeds
 
 HEADERS = {
     # A Wikimedia exige um User-Agent identificável. Troque pelo seu contato.
@@ -180,14 +181,14 @@ def sortear_artigo(sessao, cfg, categorias, usados, usados_ids, rng):
 
 # ---------------------------------------------------------------- EPUB
 
-def capitulo(arquivo, titulo, corpo, css):
-    c = epub.EpubHtml(title=titulo, file_name=arquivo, lang="pt")
+def capitulo(arquivo, titulo, corpo, css, lang="pt"):
+    c = epub.EpubHtml(title=titulo, file_name=arquivo, lang=lang)
     c.content = f"<html><body>{corpo}</body></html>"
     c.add_item(css)
     return c
 
 
-def montar_epub(cfg, artigos, data, destino, numero_edicao=None):
+def montar_epub(cfg, artigos, data, destino, numero_edicao=None, noticias=(), dw=()):
     """Monta o epub. Devolve o `info` da capa (semente, níveis etc.) para log."""
     livro = epub.EpubBook()
     livro.set_identifier(f"jornal-{data.isoformat()}")
@@ -198,7 +199,8 @@ def montar_epub(cfg, artigos, data, destino, numero_edicao=None):
     css = epub.EpubItem(uid="estilo", file_name="estilo.css", media_type="text/css", content=CSS)
     livro.add_item(css)
 
-    # Capa generativa: a semente sai dos pageids dos artigos + data.
+    # Capa generativa: a semente sai dos pageids dos artigos da Wikipedia + data.
+    # (Notícias e DW não entram: não têm pageid e mudariam o desenho se a coleta variasse.)
     png_capa, info_capa = gerar_capa(cfg["titulo"], data, [a["pageid"] for _, a in artigos],
                                      numero_edicao)
     livro.set_cover("capa.png", png_capa, create_page=False)   # capa dos metadados (biblioteca do X4)
@@ -206,6 +208,21 @@ def montar_epub(cfg, artigos, data, destino, numero_edicao=None):
                     f'<div class="capa"><img src="capa.png" alt="{html.escape(cfg["titulo"], quote=True)}"/></div>',
                     css)
     livro.add_item(capa)
+
+    def externos(prefixo, itens):
+        """Capítulos de notícias e DW (itens vindos de feeds.py)."""
+        caps_ext = []
+        for i, it in enumerate(itens, 1):
+            u = html.escape(it["url"])
+            rotulo = html.escape(it["fonte"]) + (f' · {it["data"]}' if it["data"] else "")
+            corpo = (f'<p class="tema">{rotulo}</p><h1>{html.escape(it["titulo"])}</h1>{it["html"]}'
+                     f'<p class="fonte">Fonte: <a href="{u}">{u}</a></p>')
+            c = capitulo(f"{prefixo}_{i:02d}.xhtml", f'{it["fonte"]}: {it["titulo"]}', corpo, css, it["lang"])
+            livro.add_item(c)
+            caps_ext.append(c)
+        return caps_ext
+
+    caps_not = externos("not", noticias)
 
     caps = []
     for i, (tema, art) in enumerate(artigos, 1):
@@ -228,16 +245,19 @@ def montar_epub(cfg, artigos, data, destino, numero_edicao=None):
         livro.add_item(c)
         caps.append(c)
 
+    caps_dw = externos("dw", dw)
+
     # Última página: dados de controle da capa (semente, níveis...) só para curiosidade/depuração.
     controle = capitulo("controle.xhtml", "Nota de controle",
                         html_controle(info_capa, [(t, a["titulo"], a["pageid"]) for t, a in artigos]),
                         css)
     livro.add_item(controle)
 
-    livro.toc = [capa, (epub.Section("Curiosidades"), caps), controle]
+    grupos = [("Notícias", caps_not), ("Curiosidades", caps), ("Deutsch üben", caps_dw)]
+    livro.toc = [capa] + [(epub.Section(nome), cs) for nome, cs in grupos if cs] + [controle]
     livro.add_item(epub.EpubNcx())
     livro.add_item(epub.EpubNav())
-    livro.spine = [capa, "nav"] + caps + [controle]
+    livro.spine = [capa, "nav"] + [c for _, cs in grupos for c in cs] + [controle]
 
     destino.parent.mkdir(parents=True, exist_ok=True)
     epub.write_epub(str(destino), livro)
@@ -308,6 +328,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--config", default="config.yaml")
     ap.add_argument("--validar", action="store_true", help="só testa as categorias do config")
+    ap.add_argument("--validar-feeds", action="store_true", help="só testa os feeds (notícias e DW)")
     ap.add_argument("--semente", type=int, help="semente do sorteio (reprodutível)")
     ap.add_argument("--sem-historico", action="store_true",
                     help="não lê nem grava o histórico (use em testes)")
@@ -320,16 +341,22 @@ def main():
     if args.validar:
         validar(sessao, cfg)
         return
+    if args.validar_feeds:
+        ncfg, dcfg = cfg.get("noticias") or {}, cfg.get("dw") or {}
+        validar_feeds(sessao, [ncfg, {"feeds": [dcfg["feed"]]} if dcfg.get("feed") else {}])
+        return
 
     hoje = dt.date.today()
     hcfg = {"arquivo": "historico.json", "esquecer_apos_semanas": 0, **cfg.get("historico", {})}
     usar_hist = not args.sem_historico
     caminho_hist = caminho_historico(hcfg)
     registros = carregar_historico(caminho_hist, hcfg["esquecer_apos_semanas"], hoje) if usar_hist else []
-    print(f"Histórico: {len(registros)} artigo(s) já publicado(s)" if usar_hist
+    print(f"Histórico: {len(registros)} item(ns) já publicado(s)" if usar_hist
           else "Histórico desativado (--sem-historico)")
-    usados = {r["titulo"] for r in registros}
-    usados_ids = {r["pageid"] for r in registros}
+    # Registros da Wikipedia têm pageid; os de notícias/DW têm url.
+    usados = {r["titulo"] for r in registros if "pageid" in r}
+    usados_ids = {r["pageid"] for r in registros if "pageid" in r}
+    usados_urls = {r["url"] for r in registros if "url" in r}
 
     rng = random.Random(args.semente)
     wcfg = {**cfg["wikipedia"], "imagens": cfg.get("imagens", {"ativar": False})}
@@ -354,14 +381,33 @@ def main():
         extra = ", com imagem" if art.get("imagem") else ""
         print(f'{art["titulo"]}  ({art["caminho"]}, {art["chars"]} chars{extra})')
 
-    if not artigos:
-        sys.exit("Nenhum artigo obtido; epub não gerado.")
+    agora = dt.datetime.now(dt.timezone.utc)
+    noticias, dw = [], []
+    ncfg = cfg.get("noticias") or {}
+    if ncfg.get("ativar") and (ncfg.get("feeds") or ncfg.get("opml")):
+        print("\n[Notícias] coletando...")
+        noticias = coletar_noticias(sessao, ncfg, usados_urls, agora)
+    dcfg = cfg.get("dw") or {}
+    if dcfg.get("ativar") and dcfg.get("feed"):
+        print("\n[DW] coletando...")
+        dw = coletar_noticias(sessao, {
+            "feeds": [{"nome": "DW · Top-Thema mit Vokabeln", "url": dcfg["feed"]}],
+            "por_feed": dcfg.get("quantidade", 3), "max_total": dcfg.get("quantidade", 3),
+            "dias": dcfg.get("dias", 14), "max_caracteres": dcfg.get("max_caracteres", 12000),
+            "min_caracteres": dcfg.get("min_caracteres", 800), "lang": "de",
+        }, usados_urls, agora)
+    novos += [{"tipo": tipo, "url": it["url"], "titulo": it["titulo"],
+               "fonte": it["fonte"], "data": hoje.isoformat()}
+              for tipo, itens in (("noticia", noticias), ("dw", dw)) for it in itens]
+
+    if not (artigos or noticias or dw):
+        sys.exit("Nada obtido; epub não gerado.")
 
     destino = Path(cfg["saida"]).expanduser() / f"jornal_{hoje.isoformat()}.epub"
-    info_capa = montar_epub(cfg, artigos, hoje, destino, numero_da_edicao(cfg, hoje))
+    info_capa = montar_epub(cfg, artigos, hoje, destino, numero_da_edicao(cfg, hoje), noticias, dw)
     if usar_hist:
         salvar_historico(caminho_hist, registros + novos)   # só depois do epub gerado com sucesso
-    print(f"\nEpub gerado: {destino}  ({len(artigos)} artigos)")
+    print(f"\nEpub gerado: {destino}  ({len(noticias)} notícias, {len(artigos)} curiosidades, {len(dw)} da DW)")
     print(f"Capa: semente {info_capa['semente']}, {info_capa['niveis']} níveis, "
           f"{info_capa['faixas_cinza']} faixas de cinza")
     if pulados:
