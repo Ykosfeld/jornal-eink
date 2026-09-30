@@ -99,8 +99,31 @@ temas:
     - Atores de cinema dos Estados Unidos
     - Atores de cinema do Reino Unido
 
-# Placeholders para as próximas semanas (ainda não usados pelo script)
-noticias: []      # Semana 2: lista de feeds RSS
+# Notícias: feeds RSS/Atom e/ou arquivos OPML (caminho local ou URL). Pode usar os dois ao mesmo tempo.
+# Caminhos relativos são lidos a partir da pasta do script.
+noticias:
+  ativar: true
+  dias: 7               # só entradas dos últimos 7 dias
+  por_feed: 2           # máx. de itens por feed
+  max_total: 12         # máx. na seção (revezando entre os feeds, para nenhum dominar)
+  max_caracteres: 8000
+  min_caracteres: 500   # texto extraído menor que isso -> tenta o resumo do feed
+  feeds:
+    - {nome: "Polygon", url: "https://www.polygon.com/rss/index.xml"}
+    - {nome: "Deadline", url: "https://deadline.com/feed/"}
+    - {nome: "IndieWire", url: "https://www.indiewire.com/feed"}
+    - {nome: "Variety", url: "https://variety.com/feed/"}
+    - {nome: "60-Second Science", url: "http://rss.sciam.com/sciam/60secsciencepodcast"}
+    - {nome: "Jason Schreier", url: "https://www.bloomberg.com/authors/AUvqMRVAZCw/jason-schreier.rss"}
+    # - {nome: "Exemplo", url: "https://exemplo.com/feed.xml"}
+    # - "https://outro.com/rss"          # sem nome: usa o título do feed
+  opml: []
+    # - feeds.opml
+ 
+# Alemão: seção "Deutsch üben"
 dw:
-  feed: http://rss.dw-world.de/xml/DKpodcast_topthemamitvokabeln_de
+  ativar: true
+  feed: http://rss.dw-world.de/xml/DKpodcast_topthemamitvokabeln_de   # confira com --validar-feeds
   quantidade: 3
+  dias: 14              # janela maior: o feed não publica em dia fixo
+  max_caracteres: 12000
