@@ -12,7 +12,14 @@ wikipedia:
   max_caracteres: 15000   # trunca artigos muito longos (em fim de parágrafo)
   tentativas: 8           # sorteios por tema antes de desistir
   titulos_ignorados_prefixos: ["Lista de", "Listas de", "Anexo:", "Predefinição:"]
-  
+
+
+# Histórico para nunca repetir artigos entre edições (relativo à pasta do script, se não for absoluto)
+historico:
+  arquivo: historico.json
+  esquecer_apos_semanas: 0  # artigo pode reaparecer após ~2 anos; 0 = nunca repetir
+
+
 # Imagem de destaque de cada artigo (só imagens de licença livre; se não houver, o artigo segue sem imagem)
 imagens:
   ativar: true

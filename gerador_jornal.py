@@ -4,6 +4,7 @@ import argparse
 import datetime as dt
 import html
 import io
+import json
 import random
 import sys
 from pathlib import Path
@@ -137,17 +138,18 @@ def buscar_artigo(sessao, cfg, titulo):
     if pag.get("missing") or not pag.get("extract"):
         return None
     corpo, total = limpar_html(pag["extract"], cfg["max_caracteres"])
-    return {"titulo": pag["title"], "url": pag["fullurl"], "html": corpo, "chars": total,
+    return {"pageid": pag["pageid"], "titulo": pag["title"], "url": pag["fullurl"],
+            "html": corpo, "chars": total,
             "imagem": baixar_imagem(sessao, pag, icfg)}
 
 
-def sortear_artigo(sessao, cfg, categorias, usados, rng):
+def sortear_artigo(sessao, cfg, categorias, usados, usados_ids, rng):
     """Escolhe uma raiz, desce aleatoriamente por subcategorias até achar um artigo aceitável."""
     ignorados = tuple(cfg["titulos_ignorados_prefixos"])
     for _ in range(cfg["tentativas"]):
         cat = rng.choice(categorias)
         caminho = [cat]
-        for nivel in range(cfg["profundidade_max"] + 1):    
+        for nivel in range(cfg["profundidade_max"] + 1):
             artigos, subs = membros(sessao, cfg, cat)
             artigos = [a for a in artigos if not a.startswith(ignorados) and a not in usados]
             if nivel == cfg["profundidade_max"] or not subs:
@@ -162,6 +164,8 @@ def sortear_artigo(sessao, cfg, categorias, usados, rng):
                 caminho.append(cat)
                 continue
             art = buscar_artigo(sessao, cfg, escolha)
+            if art and art["pageid"] in usados_ids:
+                break  # redirecionou para um artigo já publicado: novo sorteio
             if art and art["chars"] >= cfg["min_caracteres"]:
                 art["caminho"] = " › ".join(caminho)
                 return art
@@ -223,6 +227,35 @@ def montar_epub(cfg, artigos, data, destino):
     epub.write_epub(str(destino), livro)
 
 
+# ---------------------------------------------------------------- Histórico
+
+def caminho_historico(hcfg):
+    p = Path(hcfg["arquivo"]).expanduser()
+    return p if p.is_absolute() else Path(__file__).resolve().parent / p
+
+
+def carregar_historico(caminho, esquecer_semanas, hoje):
+    """Lê o histórico; descarta registros mais antigos que `esquecer_semanas` (0 = nunca esquece)."""
+    if not caminho.exists():
+        return []
+    try:
+        registros = json.loads(caminho.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        sys.exit(f"Histórico corrompido ({caminho}): {e}\nCorrija ou renomeie o arquivo e rode de novo.")
+    if esquecer_semanas > 0:
+        limite = hoje - dt.timedelta(weeks=esquecer_semanas)
+        registros = [r for r in registros if dt.date.fromisoformat(r["data"]) >= limite]
+    return registros
+
+
+def salvar_historico(caminho, registros):
+    """Grava de forma atômica (arquivo temporário + rename), para não corromper se cair no meio."""
+    caminho.parent.mkdir(parents=True, exist_ok=True)
+    tmp = caminho.with_suffix(".tmp")
+    tmp.write_text(json.dumps(registros, ensure_ascii=False, indent=1), encoding="utf-8")
+    tmp.replace(caminho)
+
+
 # ---------------------------------------------------------------- CLI
 
 def validar(sessao, cfg):
@@ -249,6 +282,8 @@ def main():
     ap.add_argument("--config", default="config.yaml")
     ap.add_argument("--validar", action="store_true", help="só testa as categorias do config")
     ap.add_argument("--semente", type=int, help="semente do sorteio (reprodutível)")
+    ap.add_argument("--sem-historico", action="store_true",
+                    help="não lê nem grava o histórico (use em testes)")
     args = ap.parse_args()
 
     cfg = yaml.safe_load(Path(args.config).read_text(encoding="utf-8"))
@@ -259,31 +294,50 @@ def main():
         validar(sessao, cfg)
         return
 
+    hoje = dt.date.today()
+    hcfg = {"arquivo": "historico.json", "esquecer_apos_semanas": 0, **cfg.get("historico", {})}
+    usar_hist = not args.sem_historico
+    caminho_hist = caminho_historico(hcfg)
+    registros = carregar_historico(caminho_hist, hcfg["esquecer_apos_semanas"], hoje) if usar_hist else []
+    print(f"Histórico: {len(registros)} artigo(s) já publicado(s)" if usar_hist
+          else "Histórico desativado (--sem-historico)")
+    usados = {r["titulo"] for r in registros}
+    usados_ids = {r["pageid"] for r in registros}
+
     rng = random.Random(args.semente)
     wcfg = {**cfg["wikipedia"], "imagens": cfg.get("imagens", {"ativar": False})}
-    artigos, usados = [], set()
+    artigos, novos, pulados = [], [], []
     for tema, cats in cfg["temas"].items():
         print(f"[{tema}] sorteando...", end=" ", flush=True)
         try:
-            art = sortear_artigo(sessao, wcfg, cats, usados, rng)
+            art = sortear_artigo(sessao, wcfg, cats, usados, usados_ids, rng)
         except requests.RequestException as e:
             print(f"falha de rede ({e})")
+            pulados.append(tema)
             continue
         if art is None:
-            print("nenhum artigo encontrado — tema pulado")
+            print("nenhum artigo novo encontrado — tema pulado")
+            pulados.append(tema)
             continue
         usados.add(art["titulo"])
+        usados_ids.add(art["pageid"])
         artigos.append((tema, art))
+        novos.append({"pageid": art["pageid"], "titulo": art["titulo"],
+                      "tema": tema, "data": hoje.isoformat()})
         extra = ", com imagem" if art.get("imagem") else ""
         print(f'{art["titulo"]}  ({art["caminho"]}, {art["chars"]} chars{extra})')
 
     if not artigos:
         sys.exit("Nenhum artigo obtido; epub não gerado.")
 
-    hoje = dt.date.today()
     destino = Path(cfg["saida"]).expanduser() / f"jornal_{hoje.isoformat()}.epub"
     montar_epub(cfg, artigos, hoje, destino)
+    if usar_hist:
+        salvar_historico(caminho_hist, registros + novos)   # só depois do epub gerado com sucesso
     print(f"\nEpub gerado: {destino}  ({len(artigos)} artigos)")
+    if pulados:
+        print("ATENÇÃO — temas sem artigo nesta edição: " + ", ".join(pulados)
+              + "\n  (categorias esgotadas ou falha de rede; considere adicionar mais raízes no config.yaml)")
 
 
 if __name__ == "__main__":
