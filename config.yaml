@@ -1,0 +1,84 @@
+# Configuração do Jornal Semanal — Semana 1 (só Wikipedia)
+
+saida: ./saida            # Na Semana 3 troque por ~/biblioteca-opds
+titulo: Jornal Semanal
+autor: Jornal Semanal
+idioma: pt
+
+wikipedia:
+  api: https://pt.wikipedia.org/w/api.php
+  profundidade_max: 3     # quantos níveis de subcategoria descer
+  min_caracteres: 2000    # descarta esboços
+  max_caracteres: 15000   # trunca artigos muito longos (em fim de parágrafo)
+  tentativas: 8           # sorteios por tema antes de desistir
+  titulos_ignorados_prefixos: ["Lista de", "Listas de", "Anexo:", "Predefinição:"]
+
+# Cada tema tem uma lista de categorias-raiz da pt.wikipedia (sem o prefixo "Categoria:").
+# A cada execução sorteia-se uma raiz e desce-se aleatoriamente pelas subcategorias até cair em um artigo.
+# ATENÇÃO: nomes escritos de memória — rode `python gerador_jornal.py --validar` e ajuste o que falhar.
+temas:
+  Matemática:
+    - Matemática
+    - Álgebra
+    - Geometria
+    - Teoria dos números
+    - Análise matemática
+    - Estatística
+  Física:
+    - Física
+    - Mecânica
+    - Termodinâmica
+    - Eletromagnetismo
+    - Mecânica quântica
+    - Relatividade
+  Astronomia:
+    - Astronomia
+    - Planetas
+    - Estrelas
+    - Galáxias
+    - Constelações
+  Ciências:
+    - Biologia
+    - Química
+    - Geologia
+    - Ciência
+  Música:
+    - Música
+    - Instrumentos musicais
+    - Gêneros musicais
+    - Teoria musical
+  Música clássica:
+    - Música clássica
+    - Compositores clássicos do século XX
+    - Compositores clássicos do século XIX
+    - Óperas
+    - Sinfonias
+  Aves:
+    - Aves
+    - Aves do Brasil
+    - Ordens de aves
+  Computação:
+    - Computação
+    - Algoritmos
+    - Linguagens de programação
+    - Ciência da computação
+  Video games:
+    - Jogos eletrônicos
+    - Consoles de jogos eletrônicos
+    - Gêneros de jogos eletrônicos
+  Arte:
+    - Arte
+    - Pintura
+    - Escultura
+    - Movimentos artísticos
+  Cinema:
+    - Cinema
+    - Cineastas premiados no Festival de Veneza
+    - Cineastas dos Estados Unidos
+    - Gêneros cinematográficos
+
+# Placeholders para as próximas semanas (ainda não usados pelo script)
+noticias: []      # Semana 2: lista de feeds RSS
+dw:
+  feed: http://rss.dw-world.de/xml/DKpodcast_topthemamitvokabeln_de
+  quantidade: 3
