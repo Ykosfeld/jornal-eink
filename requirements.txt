@@ -2,6 +2,8 @@ requests
 pyyaml
 beautifulsoup4
 lxml
+lxml_html_clean
 ebooklib
-Pillow
-numpy
+pillow
+feedparser
+readability-lxml
