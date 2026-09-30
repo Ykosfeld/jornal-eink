@@ -13,6 +13,7 @@ wikipedia:
   max_caracteres: 15000   # trunca artigos muito longos (em fim de parágrafo)
   tentativas: 8           # sorteios por tema antes de desistir
   titulos_ignorados_prefixos: ["Lista de", "Listas de", "Anexo:", "Predefinição:"]
+  mathml: true
 
 
 # Histórico para nunca repetir artigos entre edições (relativo à pasta do script, se não for absoluto)

@@ -9,6 +9,8 @@ import random
 import sys
 from pathlib import Path
 
+import re
+from latex2mathml.converter import convert as latex_para_mathml
 import requests
 import yaml
 from bs4 import BeautifulSoup
@@ -44,6 +46,7 @@ img { max-width: 100%; height: auto; }
 table { font-size: 0.85em; border-collapse: collapse; margin: 0.8em 0; }
 td { padding: 0.2em 1em 0.2em 0; vertical-align: top; }
 small { font-size: 0.8em; }
+math { font-size: 1em; }
 """
 
 
@@ -73,8 +76,60 @@ def membros(sessao, cfg, categoria, max_paginas_api=2):
         cont = d["continue"]
     return artigos, subs
 
+# ---------------------------------------------------------------- Fórmulas (LaTeX -> MathML)
 
-def limpar_html(extrato, max_chars):
+# A Wikipédia entrega fórmulas como "{\displaystyle ...}" (chaves aninhadas, por isso não dá para usar regex simples)
+_ABRE_FORMULA = re.compile(r"\{\s*\\(?:displaystyle|textstyle|scriptstyle)\b")
+
+
+def _fim_do_bloco(texto, inicio):
+    """Dado o índice logo após a '{' de abertura, devolve o índice da '}' que a fecha (ou -1)."""
+    profundidade, i = 1, inicio
+    while i < len(texto):
+        c = texto[i]
+        if c == "\\":
+            i += 2          # \{ e \} não contam
+            continue
+        if c == "{":
+            profundidade += 1
+        elif c == "}":
+            profundidade -= 1
+            if profundidade == 0:
+                return i
+        i += 1
+    return -1
+
+
+def converter_formulas(fragmento, mathml=True):
+    """Troca cada '{\\displaystyle ...}' por <math> (ou, se falhar/desativado, por <i>LaTeX</i>)."""
+    saida, pos = [], 0
+    while True:
+        m = _ABRE_FORMULA.search(fragmento, pos)
+        if not m:
+            saida.append(fragmento[pos:])
+            break
+        fim = _fim_do_bloco(fragmento, m.start() + 1)
+        if fim < 0:                      # chaves desbalanceadas: deixa como está
+            saida.append(fragmento[pos:])
+            break
+        saida.append(fragmento[pos:m.start()])
+        latex = html.unescape(fragmento[m.end():fim]).strip()
+        if not latex:
+            pass                         # fórmula vazia: descarta
+        else:
+            try:
+                if not mathml:
+                    raise ValueError
+                mm = latex_para_mathml(latex)
+                # alttext: leitores sem suporte a MathML ainda podem mostrar o texto
+                mm = mm.replace("<math", f'<math alttext="{html.escape(latex, quote=True)}"', 1)
+                saida.append(mm)
+            except Exception:  # noqa: BLE001
+                saida.append(f"<i>{html.escape(latex)}</i>")
+        pos = fim + 1
+    return "".join(saida)
+
+def limpar_html(extrato, max_chars, mathml=True):
     """Limpa o HTML devolvido por prop=extracts para algo adequado a e-ink."""
     soup = BeautifulSoup(extrato, "lxml")
     corpo = soup.body or soup
@@ -98,7 +153,7 @@ def limpar_html(extrato, max_chars):
             continue
         # cabeçalho sem conteúdo depois dele é removido no fim
         total += len(texto)
-        saida.append((nome, str(no)))
+        saida.append((nome, converter_formulas(str(no), mathml)))
         if total >= max_chars and nome == "p":
             break
     while saida and saida[-1][0] in ("h2", "h3", "h4"):
@@ -143,7 +198,7 @@ def buscar_artigo(sessao, cfg, titulo):
     pag = d["query"]["pages"][0]
     if pag.get("missing") or not pag.get("extract"):
         return None
-    corpo, total = limpar_html(pag["extract"], cfg["max_caracteres"])
+    corpo, total = limpar_html(pag["extract"], cfg["max_caracteres"], cfg.get("mathml", True))
     return {"pageid": pag["pageid"], "titulo": pag["title"], "url": pag["fullurl"],
             "html": corpo, "chars": total,
             "imagem": baixar_imagem(sessao, pag, icfg)}
@@ -184,6 +239,8 @@ def sortear_artigo(sessao, cfg, categorias, usados, usados_ids, rng):
 def capitulo(arquivo, titulo, corpo, css, lang="pt"):
     c = epub.EpubHtml(title=titulo, file_name=arquivo, lang=lang)
     c.content = f"<html><body>{corpo}</body></html>"
+    if "<math" in corpo:
+        c.properties.append("mathml")
     c.add_item(css)
     return c
 
