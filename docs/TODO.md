@@ -1,5 +1,5 @@
 - [] Remover artigos da wikipedia que são listas
-- [] Ler manuskript do DW Top-Thema
+- [x] ~~Ler manuskript do DW Top-Thema~~
 - [] Burlar paywall para noticias via rss feed
 - [x] ~~Resolver notação matematica (sugestão: mathML)~~
 - [] Capas terem um tema por mês, talvez mudar o algoritmo
