@@ -2,7 +2,7 @@
  
 saida: ./saida            # Na Semana 3 troque por ~/biblioteca-opds
 titulo: Jornal Semanal    # PROVISÓRIO — aparece na capa e nos metadados; trocar aqui muda tudo (não afeta o desenho da capa)
-autor: Jornal Semanal
+autor: Yuri Kosfeld
 idioma: pt
 primeira_edicao: 2026-10-02   # data da edição nº 1; a capa mostra "Nº N" (semanas desde esta data + 1). Apague a linha para omitir o número.
  
