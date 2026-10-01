@@ -8,3 +8,4 @@ pillow
 feedparser
 readability-lxml
 latex2mathml
+numpy
