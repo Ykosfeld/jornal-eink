@@ -9,6 +9,8 @@ from .formulas import converter_formulas
 SECOES_IGNORADAS = {
     "referências", "ver também", "ligações externas", "notas", "bibliografia",
     "leitura adicional", "fontes", "links externos",
+    "references", "see also", "external links", "notes", "further reading", "bibliography", "sources",
+    "einzelnachweise", "weblinks", "literatur", "siehe auch", "anmerkungen",
 }
 TAGS_PERMITIDAS = {"p", "h2", "h3", "h4", "ul", "ol", "li", "blockquote", "b", "i", "em", "strong", "sup", "sub", "br"}
 

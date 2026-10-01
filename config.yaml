@@ -128,3 +128,10 @@ dw:
   dias: 14
   max_caracteres: 12000
   sufixo_url: lm       # manuscrito do áudio; apague a linha para voltar ao comportamento antigo
+
+# Escolha do editor
+escolha_do_editor:
+  arquivo: escolha_do_editor.txt
+  max_caracteres: 30000
+  min_caracteres: 300      # abaixo disso: provável paywall
+  lang: pt                 # idioma assumido se a página não declarar

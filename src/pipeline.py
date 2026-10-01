@@ -7,6 +7,7 @@ import requests
 
 from .config import resolver_caminho
 from .epub_builder import montar_epub
+from .escolha import coletar_escolhas, consumir_fila
 from .feeds import coletar_noticias
 from .historico import caminho_historico, carregar_historico, salvar_historico
 from .wikipedia import sortear_artigo
@@ -71,7 +72,7 @@ def coletar_secao_dw(sessao, cfg, usados_urls, agora):
     }, usados_urls, agora)
 
 
-def gerar_edicao(sessao, cfg, semente=None, usar_hist=True):
+def gerar_edicao(sessao, cfg, semente=None, usar_hist=True, escolhas=()):
     hoje = dt.date.today()
     agora = dt.datetime.now(dt.timezone.utc)
 
@@ -80,29 +81,46 @@ def gerar_edicao(sessao, cfg, semente=None, usar_hist=True):
     registros = carregar_historico(caminho_hist, hcfg["esquecer_apos_semanas"], hoje) if usar_hist else []
     print(f"Histórico: {len(registros)} item(ns) já publicado(s)" if usar_hist
           else "Histórico desativado (--sem-historico)")
-    # Registros da Wikipedia têm pageid; os de notícias/DW têm url.
+    # Registros da Wikipedia têm pageid; os de notícias/DW/escolha têm url.
     usados = {r["titulo"] for r in registros if "pageid" in r}
     usados_ids = {r["pageid"] for r in registros if "pageid" in r}
     usados_urls = {r["url"] for r in registros if "url" in r}
+
+    # Escolha do editor primeiro: o que foi escolhido à mão não pode ser sorteado de novo
+    # (nem repetido nas notícias). Não consome o `rng`, então --semente continua reprodutível.
+    escolha_itens, fila = coletar_escolhas(sessao, cfg, escolhas, registros)
+    for it in escolha_itens:
+        usados_urls.add(it["url"])
+        if "pageid" in it:                       # só artigos da wiki do sorteio automático
+            usados.add(it["titulo"])
+            usados_ids.add(it["pageid"])
 
     rng = random.Random(semente)
     artigos, novos, pulados = coletar_curiosidades(sessao, cfg, usados, usados_ids, rng, hoje)
     noticias = coletar_secao_noticias(sessao, cfg, usados_urls, agora)
     dw = coletar_secao_dw(sessao, cfg, usados_urls, agora)
 
+    novos += [{"tipo": "escolha", "url": it["url"], "titulo": it["titulo"], "fonte": it["fonte"],
+               "data": hoje.isoformat(), **({"pageid": it["pageid"]} if "pageid" in it else {})}
+              for it in escolha_itens]
     novos += [{"tipo": tipo, "url": it["url"], "titulo": it["titulo"],
                "fonte": it["fonte"], "data": hoje.isoformat()}
               for tipo, itens in (("noticia", noticias), ("dw", dw)) for it in itens]
 
-    if not (artigos or noticias or dw):
+    if not (escolha_itens or artigos or noticias or dw):
         sys.exit("Nada obtido; epub não gerado.")
 
     destino = resolver_caminho(cfg["saida"]) / f"jornal_{hoje.isoformat()}.epub"
-    info_capa = montar_epub(cfg, artigos, hoje, destino, numero_da_edicao(cfg, hoje), noticias, dw)
+    info_capa = montar_epub(cfg, artigos, hoje, destino, numero_da_edicao(cfg, hoje),
+                            noticias, dw, escolhas=escolha_itens)
     if usar_hist:
         salvar_historico(caminho_hist, registros + novos)   # só depois do epub gerado com sucesso
+        consumir_fila(fila)                                 # idem: a fila só esvazia após publicar
+    elif fila["publicados"]:
+        print("(--sem-historico: a fila de escolhas foi mantida)")
 
-    print(f"\nEpub gerado: {destino}  ({len(noticias)} notícias, {len(artigos)} curiosidades, {len(dw)} da DW)")
+    print(f"\nEpub gerado: {destino}  ({len(escolha_itens)} escolha(s) do editor, {len(noticias)} notícias, "
+          f"{len(artigos)} curiosidades, {len(dw)} da DW)")
     print(f"Capa: semente {info_capa['semente']}, {info_capa['niveis']} níveis, "
           f"{info_capa['faixas_cinza']} faixas de cinza")
     if pulados:
