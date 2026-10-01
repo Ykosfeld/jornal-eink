@@ -1,6 +1,6 @@
 # Configuração do Jornal Semanal — Semana 1 (só Wikipedia + capa generativa)
  
-saida: ./saida            # Na Semana 3 troque por ~/biblioteca-opds
+saida: ~/biblioteca-opds            # Na Semana 3 troque por ~/biblioteca-opds
 titulo: Gazeta dos Gazeteiros    # PROVISÓRIO — aparece na capa e nos metadados; trocar aqui muda tudo (não afeta o desenho da capa)
 autor: Yuri Kosfeld
 idioma: pt
