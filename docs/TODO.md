@@ -7,4 +7,4 @@
 - [] Buscar artigos que tem relação com algum dos ultimos filmes vistos (usar letterboxd rss feed -> ordenar por nota; coração)
 - [x] ~~Formatar e dar mais cara de jornal~~
 - [x] ~~Colocar a opção de pegar um artigo da wikipedia selecionado manualmente e chama-lo de escolha do editor~~
-- [] Obituario, feriados, e coisas legais da "pagina inicial" da wikipedia
+- [x] ~~Obituário, feriados e curiosidades da página inicial da Wikipédia (Almanaque)~~

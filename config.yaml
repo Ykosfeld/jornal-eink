@@ -136,9 +136,75 @@ escolha_do_editor:
   min_caracteres: 300      # abaixo disso: provável paywall
   lang: pt                 # idioma assumido se a página não declarar
 
+# Almanaque semanal: efemérides, datas, imagem do dia e destaques da Wikipédia.
+almanaque:
+  ativar: true
+  dias: 7
+  anos_minimos_mortes: 50
+  imagem: true
+  imagem_proporcao_max: 2.2
+  max_caracteres_extrato: 400
+  destaque:
+    ativar: true
+    idioma: en
+    maximo: 3
+    verificar_pt: false
+    chamadas:
+      - "Importado da Wikipédia em inglês"
+      - "Veio de longe (e sem pagar frete)"
+      - "Passaporte carimbado"
+      - "Turismo intelectual sem sair de casa"
+      - "Sotaque incluso"
+    chamadas_tema:
+      - "Tem gringo famoso na área"
+      - "Isto tem a sua cara, mesmo em inglês"
+      - "Não perca! Vale o dicionário"
+      - "Corra para ler: é do seu ramo"
+      - "Gringo, mas da sua turma"
+      - "Até o inglês se rende ao assunto"
+    palavras_chave_en:
+      Matemática: [mathematician, mathematics, algebra, geometry, theorem, statistician]
+      Física: [physicist, physics, quantum, relativity, electromagnetism, thermodynamics]
+      Astronomia: [astronomer, astronomy, astrophysicist, planet, comet, telescope, star, galaxy]
+      Ciências: [scientist, biologist, chemist, geologist, naturalist, discovery]
+      Música: [musician, singer, band, album, guitarist, drummer, songwriter]
+      Música clássica: [composer, pianist, violinist, conductor, opera, symphony, cellist]
+      Aves: [ornithologist, bird, birds, parrot, owl, eagle]
+      Computação: [programmer, computing, computer, algorithm, internet, software]
+      Video games: [video game, video games, console, game designer]
+      Arte: [painter, sculptor, artist, architect, photographer, painting]
+      Cinema: [film, films, filmmaker, director, actor, actress, screenwriter, cinema]
+  feriados:
+    quantidade: 5
+    ancoras:
+      "01-01": "Confraternização Universal"
+      "04-21": "Tiradentes"
+      "05-01": "Dia do Trabalho"
+      "09-07": "Independência do Brasil"
+      "10-12": "Nossa Senhora Aparecida / Dia das Crianças"
+      "10-15": "Dia do Professor"
+      "10-31": "Dia do Saci"
+      "11-02": "Finados"
+      "11-15": "Proclamação da República"
+      "11-20": "Dia da Consciência Negra"
+      "12-25": "Natal"
+  palavras_penalizadas: [futebolista, politico, deputado, vereador, prefeito, candidato, pastor, apresentador, influenciador]
+  palavras_chave:
+    Matemática: [matematico, matematica, algebra, geometria, teorema, estatistico]
+    Física: [fisico, fisica, quantica, relatividade, eletromagnetismo, termodinamica]
+    Astronomia: [astronomo, astronomia, astrofisico, planeta, cometa, telescopio, estrela, galaxia]
+    Ciências: [cientista, biologo, quimico, geologo, naturalista, descoberta]
+    Música: [musico, cantor, cantora, banda, album, guitarrista, baterista, compositor]
+    Música clássica: [compositor, pianista, violinista, maestro, opera, sinfonia, violoncelista]
+    Aves: [ornitologo, ave, aves, passaro, pássaro]
+    Computação: [programador, computacao, informatica, algoritmo, internet, software]
+    Video games: [jogo eletronico, videogame, console, game designer]
+    Arte: [pintor, pintora, escultor, escultora, artista plastico, arquiteto, fotografo]
+    Cinema: [cineasta, diretor de cinema, ator, atriz, filme, roteirista, cinema]
+
 # ---------------------------------------------------------------------------
 # Layout do jornal: seções (colunas) × fontes. ACRESCENTAR ao final do config.yaml.
-# Fontes válidas: qualquer chave de `temas:` + as reservadas: editor, noticias, dw (letterboxd: futuro).
+# Fontes válidas: qualquer chave de `temas:` + as reservadas: editor, noticias, dw, almanaque (letterboxd: futuro).
 # Cada fonte só pode aparecer uma vez. Ordem das seções no epub = ordem desta lista.
 # `ordem` (opcional): sequencial (padrão: todos os itens da 1ª fonte, depois da 2ª...)
 #                     intercalar (round-robin entre as fontes)
@@ -158,6 +224,8 @@ escolha_do_editor:
  
 # Exemplo de layout por assunto (troque pelo bloco acima para usar):
 secoes:
+   - nome: Almanaque
+     fontes: [almanaque]
    - nome: Escolha do Editor
      fontes: [editor]
    - nome: Atualidades

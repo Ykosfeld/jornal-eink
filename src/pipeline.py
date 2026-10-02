@@ -5,12 +5,13 @@ import sys
 
 import requests
 
+from .almanaque import coletar_almanaque
 from .config import resolver_caminho
 from .epub_builder import montar_epub
 from .escolha import coletar_escolhas, consumir_fila
 from .feeds import coletar_noticias
 from .historico import caminho_historico, carregar_historico, salvar_historico
-from .itens import item_curiosidade, item_editor, item_externo
+from .itens import item_almanaque, item_curiosidade, item_editor, item_externo
 from .layout import ErroLayout, fontes_usadas, montar_secoes, resolver_layout
 from .relatorio import dados_relatorio, gravar_relatorio, resumo_texto
 from .wikipedia import sortear_artigo
@@ -146,6 +147,17 @@ def gerar_edicao(sessao, cfg, semente=None, usar_hist=True, escolhas=()):
         coletado["dw"] = [item_externo("dw", it) for it in dw]
         if not dw:
             motivos["dw"] = "sem itens na janela" if _dw_ativa(cfg) else "desativada"
+    almanaque = None
+    if "almanaque" in usadas:
+        if (cfg.get("almanaque") or {}).get("ativar", True):
+            print("\n[Almanaque] coletando...")
+            almanaque = coletar_almanaque(sessao, cfg, hoje, semente)
+        else:
+            motivos["almanaque"] = "desativado"
+        if almanaque:
+            coletado["almanaque"] = [item_almanaque(almanaque)]
+        else:
+            motivos.setdefault("almanaque", "sem dados na janela")
     if "letterboxd" in usadas:
         motivos["letterboxd"] = "coletor não implementado"
 
@@ -156,7 +168,7 @@ def gerar_edicao(sessao, cfg, semente=None, usar_hist=True, escolhas=()):
                "fonte": it["fonte"], "data": hoje.isoformat()}
               for tipo, itens in (("noticia", noticias), ("dw", dw)) for it in itens]
 
-    if not any(coletado.values()):
+    if not any(itens for fonte, itens in coletado.items() if fonte != "almanaque"):
         sys.exit("Nada obtido; epub não gerado.")
 
     secoes = montar_secoes(layout, coletado, motivos)
@@ -176,7 +188,8 @@ def gerar_edicao(sessao, cfg, semente=None, usar_hist=True, escolhas=()):
     rel = gravar_relatorio(rcfg, dados_relatorio(secoes, hoje, numero, destino.name), destino.stem)
 
     print(f"\nEpub gerado: {destino}  ({len(escolha_itens)} escolha(s) do editor, {len(noticias)} notícias, "
-          f"{len(artigos)} curiosidades, {len(dw)} da DW)")
+          f"{len(artigos)} curiosidades, {len(dw)} da DW, "
+          f"{1 if almanaque else 0} Almanaque)")
     print(f"Capa: semente {info_capa['semente']}, {info_capa['niveis']} níveis, "
           f"{info_capa['faixas_cinza']} faixas de cinza")
     print(resumo_texto(secoes))
