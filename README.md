@@ -7,6 +7,7 @@ Gera toda semana um **.epub** personalizado, no formato de jornal, para ler em e
 ## O que tem em cada edição
 
 - **Notícias**: itens recentes de feeds RSS/Atom (ou arquivos OPML) à sua escolha, revezando entre as fontes.
+- **Almanaque**: efemérides da semana, curiosidades, datas e destaques da Wikipédia em inglês marcados `[EN]`.
 - **Curiosidades**: um artigo aleatório da Wikipédia em português para cada tema configurado (matemática, física, astronomia, música, aves, cinema etc.), com imagem de destaque em tons de cinza e fórmulas convertidas para MathML.
 - **Deutsch üben**: artigos do *Top-Thema mit Vokabeln* da DW (nível B1), com manuscrito e glossário.
 - **Capa generativa**: mapa topográfico em tons de cinza, gerado a partir dos artigos e da data da edição (mesma edição, mesma capa).
@@ -53,14 +54,16 @@ Tudo fica no `config.yaml`:
 | `imagens` | Tamanho e qualidade das imagens (ajustados para e-ink) |
 | `noticias` | Feeds/OPML, itens por feed e janela de dias |
 | `dw` | Feed, quantidade de artigos e opções do manuscrito |
+| `almanaque` | Efemérides da semana, imagem e destaques da Wikipédia |
+| `secoes` | Fontes de cada seção e ordem no epub; coloque `almanaque` primeiro para exibi-lo logo após a capa |
 | `historico` | Arquivo do histórico e por quanto tempo lembrar |
 
 ## Automação e entrega
 
-Para rodar toda semana (exemplo: sextas, 7h), use o `cron`:
+Para rodar toda semana (exemplo: domingos, 7h), use o `cron`:
 
 ```cron
-0 7 * * 5 cd /caminho/para/jornal-eink && .venv/bin/python main.py
+0 7 * * 0 cd /caminho/para/jornal-eink && .venv/bin/python main.py
 ```
 
 Para receber o epub no e-reader por Wi-Fi, aponte `saida` para uma pasta servida por um catálogo OPDS, como o [dir2opds](https://github.com/dubyte/dir2opds), e adicione a URL do catálogo no leitor.
@@ -71,7 +74,10 @@ Para receber o epub no e-reader por Wi-Fi, aponte `saida` para uma pasta servida
 main.py              # CLI
 config.yaml          # configuração
 src/
+  almanaque.py      # coleta de efemérides e destaques da Wikipédia
   pipeline.py        # orquestra coleta -> epub -> histórico
+  itens.py           # adapta coletores ao formato uniforme de seção
+  layout.py          # valida fontes e ordena seções configuráveis
   wikipedia.py       # sorteio e limpeza de artigos
   feeds.py           # notícias (RSS/OPML) e DW
   formulas.py        # LaTeX -> MathML
