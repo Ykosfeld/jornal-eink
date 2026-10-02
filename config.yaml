@@ -16,7 +16,7 @@ wikipedia:
   mathml: true
   filtro_qualidade:
     ativar: true
-    classe_minima: B       # classes ORES: Stub, Start, C, B, GA, FA
+    classe_minima: C       # classes ORES: Stub, Start, C, B, GA, FA
     timeout: 10            # segundos por avaliação remota
 
 
@@ -107,9 +107,9 @@ temas:
 # Prioriza artigos de Cinema por filmes assistidos no Letterboxd.
 # A integração é opcional e não altera o sorteio quando desativada.
 personalizacao_cultural:
-  ativar: false
+  ativar: true
   letterboxd:
-    ativar: false
+    ativar: true
     feed_url: https://letterboxd.com/ykosfeld/rss/
     janela_dias: 7
     max_filmes: 7                 # máximo de filmes recentes considerados, já ordenados
@@ -125,11 +125,11 @@ noticias:
   max_caracteres: 8000
   min_caracteres: 500   # texto extraído menor que isso -> tenta o resumo do feed
   feeds:
-    - {nome: "Polygon", url: "https://www.polygon.com/rss/index.xml"}
-    - {nome: "Deadline", url: "https://deadline.com/feed/"}
-    - {nome: "IndieWire", url: "https://www.indiewire.com/feed"}
+    # - {nome: "Polygon", url: "https://www.polygon.com/rss/index.xml"}
+    # - {nome: "Deadline", url: "https://deadline.com/feed/"}
+    # - {nome: "IndieWire", url: "https://www.indiewire.com/feed"}
     - {nome: "Variety", url: "https://variety.com/feed/"}
-    - {nome: "Jason Schreier", url: "https://www.bloomberg.com/authors/AUvqMRVAZCw/jason-schreier.rss"}
+    # - {nome: "Jason Schreier", url: "https://www.bloomberg.com/authors/AUvqMRVAZCw/jason-schreier.rss"}
     # - {nome: "Exemplo", url: "https://exemplo.com/feed.xml"}
     # - "https://outro.com/rss"          # sem nome: usa o título do feed
   opml: []
