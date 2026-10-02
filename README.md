@@ -8,7 +8,7 @@ Gera toda semana um **.epub** personalizado, no formato de jornal, para ler em e
 
 - **Notícias**: itens recentes de feeds RSS/Atom (ou arquivos OPML) à sua escolha, revezando entre as fontes.
 - **Almanaque**: efemérides da semana, curiosidades, datas e destaques da Wikipédia em inglês marcados `[EN]`.
-- **Curiosidades**: um artigo aleatório da Wikipédia em português para cada tema configurado (matemática, física, astronomia, música, aves, cinema etc.), com imagem de destaque em tons de cinza e fórmulas convertidas para MathML.
+- **Curiosidades**: um artigo da Wikipédia em português para cada tema configurado (matemática, física, astronomia, música, aves, cinema etc.), normalmente sorteado; opcionalmente, Cinema pode priorizar artigos relacionados a filmes recentes do Letterboxd. Com imagem de destaque em tons de cinza e fórmulas convertidas para MathML.
 - **Deutsch üben**: artigos do *Top-Thema mit Vokabeln* da DW (nível B1), com manuscrito e glossário.
 - **Capa generativa**: mapa topográfico em tons de cinza, gerado a partir dos artigos e da data da edição (mesma edição, mesma capa).
 - **Sem repetição**: um histórico em JSON evita que o mesmo artigo ou notícia apareça em duas edições.
@@ -55,8 +55,16 @@ Tudo fica no `config.yaml`:
 | `noticias` | Feeds/OPML, itens por feed e janela de dias |
 | `dw` | Feed, quantidade de artigos e opções do manuscrito |
 | `almanaque` | Efemérides da semana, imagem e destaques da Wikipédia |
+| `personalizacao_cultural.letterboxd` | Prioriza artigos de Cinema pelos filmes assistidos, nota, data e créditos na Wikipédia |
 | `secoes` | Fontes de cada seção e ordem no epub; coloque `almanaque` primeiro para exibi-lo logo após a capa |
 | `historico` | Arquivo do histórico e por quanto tempo lembrar |
+
+Para ativar a personalização de Cinema, defina `personalizacao_cultural.ativar`
+e `personalizacao_cultural.letterboxd.ativar` como `true` e configure
+`feed_url` com a URL RSS do seu perfil. Por padrão são considerados os filmes
+assistidos nos últimos 7 dias, ordenados por nota e depois pela data assistida.
+Os artigos relacionados respeitam o histórico e o filtro ORES; se não houver
+uma relação elegível ou o feed falhar, o sorteio normal continua como fallback.
 
 O filtro ORES do sorteio de artigos é configurável em `wikipedia.filtro_qualidade`.
 Ele avalia a revisão atual do candidato (classes Stub, Start, C, B, GA e FA) e,

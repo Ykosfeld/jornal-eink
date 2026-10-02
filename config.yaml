@@ -104,6 +104,17 @@ temas:
     - Atores de cinema dos Estados Unidos
     - Atores de cinema do Reino Unido
 
+# Prioriza artigos de Cinema por filmes assistidos no Letterboxd.
+# A integração é opcional e não altera o sorteio quando desativada.
+personalizacao_cultural:
+  ativar: false
+  letterboxd:
+    ativar: false
+    feed_url: https://letterboxd.com/ykosfeld/rss/
+    janela_dias: 7
+    max_filmes: 7                 # máximo de filmes recentes considerados, já ordenados
+    max_creditos_por_filme: 5     # máximo de créditos da infocaixa consultados por filme
+
 # Notícias: feeds RSS/Atom e/ou arquivos OPML (caminho local ou URL). Pode usar os dois ao mesmo tempo.
 # Caminhos relativos são lidos a partir da pasta do script.
 noticias:
