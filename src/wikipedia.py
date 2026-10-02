@@ -2,6 +2,7 @@
 import io
 import logging
 import math
+import re
 
 import requests
 from bs4 import BeautifulSoup
@@ -20,6 +21,7 @@ SECOES_IGNORADAS = {
     "einzelnachweise", "weblinks", "literatur", "siehe auch", "anmerkungen",
 }
 TAGS_PERMITIDAS = {"p", "h2", "h3", "h4", "ul", "ol", "li", "blockquote", "b", "i", "em", "strong", "sup", "sub", "br"}
+_TEX_COM_ESTILO = re.compile(r"^\{\s*\\(?:displaystyle|textstyle|scriptstyle)\b")
 
 
 # ---------------------------------------------------------------- API
@@ -51,6 +53,32 @@ def membros(sessao, cfg, categoria, max_paginas_api=2):
 
 # ---------------------------------------------------------------- Conteúdo
 
+def _normalizar_formulas(no):
+    """Substitui cada fórmula da Wikipédia por um marcador e devolve suas fontes LaTeX."""
+    formulas = {}
+    contadores = list(no.select(".mwe-math-element"))
+    contadores.extend(
+        formula for formula in no.find_all("math")
+        if formula.find_parent(class_="mwe-math-element") is None
+    )
+    for indice, formula in enumerate(contadores):
+        anotacao = formula.find("annotation", attrs={"encoding": "application/x-tex"})
+        imagem = formula.find("img", alt=True)
+        latex = (anotacao.get_text() if anotacao else
+                 imagem.get("alt", "") if imagem else "")
+        if not latex:
+            latex = formula.get_text(" ", strip=True)
+        latex = latex.strip()
+        if not latex:
+            continue
+        marcador = f"WIKIPEDIA_MATH_{indice}_PLACEHOLDER"
+        while marcador in str(no):
+            marcador += "_"
+        formulas[marcador] = latex
+        formula.replace_with(marcador)
+    return formulas
+
+
 def limpar_html(extrato, max_chars, mathml=True):
     """Limpa o HTML devolvido por prop=extracts para algo adequado a e-ink."""
     soup = BeautifulSoup(extrato, "lxml")
@@ -64,6 +92,7 @@ def limpar_html(extrato, max_chars, mathml=True):
             pulando = no.get_text(strip=True).lower() in SECOES_IGNORADAS
         if pulando or nome not in TAGS_PERMITIDAS:
             continue
+        formulas = _normalizar_formulas(no)
         for t in no.find_all(True):
             if t.name not in TAGS_PERMITIDAS:
                 t.unwrap()
@@ -73,8 +102,15 @@ def limpar_html(extrato, max_chars, mathml=True):
         texto = no.get_text(strip=True)
         if not texto:
             continue
+        for marcador, latex in formulas.items():
+            texto = texto.replace(marcador, latex)
         total += len(texto)
-        saida.append((nome, converter_formulas(str(no), mathml)))
+        html_no = converter_formulas(str(no), mathml)
+        for marcador, latex in formulas.items():
+            if not _TEX_COM_ESTILO.match(latex):
+                latex = r"{\displaystyle " + latex + "}"
+            html_no = html_no.replace(marcador, converter_formulas(latex, mathml))
+        saida.append((nome, html_no))
         if total >= max_chars and nome == "p":
             break
     # cabeçalho sem conteúdo depois dele é removido

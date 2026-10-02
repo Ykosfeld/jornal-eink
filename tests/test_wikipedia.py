@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import requests
 
-from src.wikipedia import avaliar_qualidade_ores, buscar_artigo, sortear_artigo
+from src.wikipedia import avaliar_qualidade_ores, buscar_artigo, limpar_html, sortear_artigo
 
 
 class Resposta:
@@ -44,6 +44,51 @@ def configuracao(**extra):
 
 
 class WikipediaQualityTests(unittest.TestCase):
+    def test_limpar_html_converte_formula_wikipedia_uma_unica_vez(self):
+        extrato = """
+        <p>Fermat: <span class="mwe-math-element">
+          <span class="mwe-math-mathml-inline">
+            <math><semantics><mrow><mn>5</mn></mrow>
+              <annotation encoding="application/x-tex">{\\displaystyle 5}</annotation>
+            </semantics></math>
+          </span>
+          <img class="mwe-math-fallback-image-inline" alt="{\\displaystyle 5}"/>
+        </span> até <span class="mwe-math-element">
+          <span class="mwe-math-mathml-inline">
+            <math><semantics><mrow><msub><mi>F</mi><mn>23288</mn></msub></mrow>
+              <annotation encoding="application/x-tex">F_{23288}</annotation>
+            </semantics></math>
+          </span>
+          <img class="mwe-math-fallback-image-inline" alt="{\\displaystyle F_{23288}}"/>
+        </span>.</p>
+        """
+
+        corpo, _ = limpar_html(extrato, 15000)
+
+        self.assertEqual(corpo.count("<math"), 2)
+        self.assertNotIn("<img", corpo)
+        self.assertIn("F_{23288}", corpo)
+        self.assertIn("<msub>", corpo)
+        self.assertEqual(corpo.count("<mn>5</mn>"), 1)
+        self.assertIn("Fermat:", corpo)
+        self.assertIn("até", corpo)
+
+    def test_limpar_html_preserva_formula_sem_mathml_sem_repetir_fallback(self):
+        extrato = """
+        <p>Valor <span class="mwe-math-element">
+          <math><semantics><mn>5</mn>
+            <annotation encoding="application/x-tex">{\\displaystyle 5}</annotation>
+          </semantics></math>
+          <img alt="{\\displaystyle 5}"/>
+        </span>.</p>
+        """
+
+        corpo, _ = limpar_html(extrato, 15000, mathml=False)
+
+        self.assertEqual(corpo.count("<i>"), 1)
+        self.assertNotIn("<img", corpo)
+        self.assertIn("Valor", corpo)
+
     def test_buscar_artigo_retorna_id_da_revisao_atual(self):
         sessao = SessaoFalsa(Resposta({"query": {"pages": [{
             "pageid": 12,
