@@ -49,7 +49,7 @@ Tudo fica no `config.yaml`:
 | `titulo`, `autor`, `idioma` | Metadados do epub e título da capa |
 | `primeira_edicao` | Data da edição nº 1 (a capa mostra "Nº N") |
 | `saida` | Pasta de destino dos epubs |
-| `wikipedia` | Tamanho mínimo/máximo dos artigos, profundidade de busca nas categorias |
+| `wikipedia` | Tamanho mínimo/máximo, profundidade de busca e classe mínima de qualidade ORES |
 | `temas` | Temas e categorias-raiz da Wikipédia usadas no sorteio |
 | `imagens` | Tamanho e qualidade das imagens (ajustados para e-ink) |
 | `noticias` | Feeds/OPML, itens por feed e janela de dias |
@@ -57,6 +57,13 @@ Tudo fica no `config.yaml`:
 | `almanaque` | Efemérides da semana, imagem e destaques da Wikipédia |
 | `secoes` | Fontes de cada seção e ordem no epub; coloque `almanaque` primeiro para exibi-lo logo após a capa |
 | `historico` | Arquivo do histórico e por quanto tempo lembrar |
+
+O filtro ORES do sorteio de artigos é configurável em `wikipedia.filtro_qualidade`.
+Ele avalia a revisão atual do candidato (classes Stub, Start, C, B, GA e FA) e,
+por padrão, aceita B ou superior. Candidatos abaixo do limiar são descartados e
+o sorteio tenta outro; se o serviço ORES falhar, o artigo segue pelos critérios
+atuais e um aviso é registrado. Use `ativar: false` para desligar o filtro. Se a
+opção não estiver configurada, o sorteio mantém o comportamento anterior.
 
 ## Automação e entrega
 

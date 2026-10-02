@@ -1,10 +1,17 @@
 """Wikipedia: sorteio de artigos por categoria, limpeza de HTML e imagem de destaque."""
 import io
+import logging
+import math
 
+import requests
 from bs4 import BeautifulSoup
 from PIL import Image, ImageOps
 
 from .formulas import converter_formulas
+
+logger = logging.getLogger(__name__)
+ORES_API = "https://ores.wikimedia.org/v3/scores/ptwiki/"
+CLASSES_QUALIDADE = {"STUB": 1, "START": 2, "C": 3, "B": 4, "GA": 5, "FA": 6}
 
 SECOES_IGNORADAS = {
     "referências", "ver também", "ligações externas", "notas", "bibliografia",
@@ -107,16 +114,44 @@ def baixar_imagem(sessao, pag, icfg):
 
 def buscar_artigo(sessao, cfg, titulo):
     icfg = cfg.get("imagens", {"ativar": False})
-    d = api(sessao, cfg, action="query", prop="extracts|info|pageimages", inprop="url",
+    d = api(sessao, cfg, action="query", prop="extracts|info|pageimages|revisions", inprop="url",
             titles=titulo, exlimit=1, redirects=1,
-            piprop="thumbnail|name", pithumbsize=icfg.get("thumb", 800), pilicense="free")
+            piprop="thumbnail|name", pithumbsize=icfg.get("thumb", 800), pilicense="free",
+            rvprop="ids", rvlimit=1)
     pag = d["query"]["pages"][0]
     if pag.get("missing") or not pag.get("extract"):
         return None
     corpo, total = limpar_html(pag["extract"], cfg["max_caracteres"], cfg.get("mathml", True))
+    revisoes = pag.get("revisions", [])
     return {"pageid": pag["pageid"], "titulo": pag["title"], "url": pag["fullurl"],
             "html": corpo, "chars": total,
+            "revid": revisoes[0].get("revid") if revisoes else None,
             "imagem": baixar_imagem(sessao, pag, icfg)}
+
+
+def avaliar_qualidade_ores(sessao, revid, timeout):
+    """Devolve (classe ordinal, erro); erro None indica uma avaliação utilizável."""
+    if revid is None:
+        return None, "ID da revisão ausente"
+    try:
+        resposta = sessao.get(
+            ORES_API,
+            params={"models": "articlequality", "revids": revid},
+            timeout=timeout,
+        )
+        resposta.raise_for_status()
+        dados = resposta.json()
+    except (requests.RequestException, ValueError) as e:
+        return None, str(e)
+
+    try:
+        previsao = dados["ptwiki"]["scores"][str(revid)]["articlequality"]["score"]["prediction"]
+    except (KeyError, TypeError):
+        return None, "resposta sem previsão articlequality"
+    classe = str(previsao)
+    if classe not in {"1", "2", "3", "4", "5", "6"}:
+        return None, f"classe articlequality desconhecida: {classe}"
+    return int(classe), None
 
 
 # ---------------------------------------------------------------- Sorteio
@@ -124,6 +159,18 @@ def buscar_artigo(sessao, cfg, titulo):
 def sortear_artigo(sessao, cfg, categorias, usados, usados_ids, rng):
     """Escolhe uma raiz, desce aleatoriamente por subcategorias até achar um artigo aceitável."""
     ignorados = tuple(cfg["titulos_ignorados_prefixos"])
+    filtro = cfg.get("filtro_qualidade", {})
+    filtro_ativo = filtro.get("ativar", False)
+    classe_minima = None
+    timeout_ores = filtro.get("timeout", 10)
+    if filtro_ativo:
+        nome_classe = str(filtro.get("classe_minima", "B")).upper()
+        if nome_classe not in CLASSES_QUALIDADE:
+            raise ValueError(f"classe mínima ORES inválida: {nome_classe}")
+        classe_minima = CLASSES_QUALIDADE[nome_classe]
+        if (isinstance(timeout_ores, bool) or not isinstance(timeout_ores, (int, float))
+                or not math.isfinite(timeout_ores) or timeout_ores <= 0):
+            raise ValueError("timeout do ORES deve ser um número positivo")
     for _ in range(cfg["tentativas"]):
         cat = rng.choice(categorias)
         caminho = [cat]
@@ -145,6 +192,15 @@ def sortear_artigo(sessao, cfg, categorias, usados, usados_ids, rng):
             if art and art["pageid"] in usados_ids:
                 break  # redirecionou para um artigo já publicado: novo sorteio
             if art and art["chars"] >= cfg["min_caracteres"]:
+                if filtro_ativo:
+                    classe, erro = avaliar_qualidade_ores(sessao, art.get("revid"), timeout_ores)
+                    if erro:
+                        logger.warning(
+                            "ORES indisponível para '%s'; aceitando candidato sem filtro de qualidade: %s",
+                            art["titulo"], erro,
+                        )
+                    elif classe is not None and classe < classe_minima:
+                        break
                 art["caminho"] = " › ".join(caminho)
                 return art
             break  # artigo curto/vazio: novo sorteio
