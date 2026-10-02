@@ -14,6 +14,10 @@ wikipedia:
   tentativas: 8           # sorteios por tema antes de desistir
   titulos_ignorados_prefixos: ["Lista de", "Listas de", "Anexo:", "Predefinição:"]
   mathml: true
+  filtro_qualidade:
+    ativar: true
+    classe_minima: B       # classes ORES: Stub, Start, C, B, GA, FA
+    timeout: 10            # segundos por avaliação remota
 
 
 # Histórico para nunca repetir artigos entre edições (relativo à pasta do script, se não for absoluto)
