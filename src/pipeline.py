@@ -13,6 +13,7 @@ from .feeds import coletar_noticias
 from .historico import caminho_historico, carregar_historico, salvar_historico
 from .itens import item_almanaque, item_curiosidade, item_editor, item_externo
 from .layout import ErroLayout, fontes_usadas, montar_secoes, resolver_layout
+from .letterboxd import priorizar_artigo, validar_config as validar_letterboxd_config
 from .relatorio import dados_relatorio, gravar_relatorio, resumo_texto
 from .wikipedia import sortear_artigo
 
@@ -27,7 +28,7 @@ def numero_da_edicao(cfg, hoje):
     return (hoje - primeira).days // 7 + 1
 
 
-def coletar_curiosidades(sessao, cfg, usados, usados_ids, rng, hoje, temas=None):
+def coletar_curiosidades(sessao, cfg, usados, usados_ids, rng, hoje, temas=None, priorizados=None):
     """Um artigo da Wikipedia por tema (`temas`: {tema: categorias}; padrão: todos de cfg["temas"]).
 
     Devolve (artigos, registros_novos, pulados), com `pulados` = {tema: motivo}.
@@ -35,11 +36,17 @@ def coletar_curiosidades(sessao, cfg, usados, usados_ids, rng, hoje, temas=None)
     """
     wcfg = {**cfg["wikipedia"], "imagens": cfg.get("imagens", {"ativar": False})}
     temas = cfg["temas"] if temas is None else temas
+    priorizados = priorizados or {}
     artigos, novos, pulados = [], [], {}
     for tema, cats in temas.items():
-        print(f"[{tema}] sorteando...", end=" ", flush=True)
+        art = priorizados.get(tema)
+        if art:
+            print(f"[{tema}] priorizado pelo Letterboxd...", end=" ", flush=True)
+        else:
+            print(f"[{tema}] sorteando...", end=" ", flush=True)
         try:
-            art = sortear_artigo(sessao, wcfg, cats, usados, usados_ids, rng)
+            if art is None:
+                art = sortear_artigo(sessao, wcfg, cats, usados, usados_ids, rng)
         except requests.RequestException as e:
             print(f"falha de rede ({e})")
             pulados[tema] = "falha de rede"
@@ -131,7 +138,22 @@ def gerar_edicao(sessao, cfg, semente=None, usar_hist=True, escolhas=()):
 
     rng = random.Random(semente)
     temas_usados = {t: c for t, c in (cfg.get("temas") or {}).items() if t in usadas}
-    artigos, novos, pulados = coletar_curiosidades(sessao, cfg, usados, usados_ids, rng, hoje, temas_usados)
+    priorizados = {}
+    pcfg = cfg.get("personalizacao_cultural") or {}
+    lcfg = pcfg.get("letterboxd") or {}
+    if pcfg.get("ativar") and lcfg.get("ativar") and "Cinema" in temas_usados:
+        try:
+            validar_letterboxd_config(lcfg)
+            art, motivo = priorizar_artigo(sessao, cfg, usados, usados_ids, hoje)
+        except ValueError as e:
+            sys.exit(str(e))
+        if art:
+            priorizados["Cinema"] = art
+        elif motivo:
+            print(f"Aviso Letterboxd: {motivo}; usando o sorteio normal de Cinema.")
+    artigos, novos, pulados = coletar_curiosidades(
+        sessao, cfg, usados, usados_ids, rng, hoje, temas_usados, priorizados,
+    )
     for tema, art in artigos:
         coletado[tema] = [item_curiosidade(tema, art)]
     motivos.update(pulados)
@@ -158,9 +180,6 @@ def gerar_edicao(sessao, cfg, semente=None, usar_hist=True, escolhas=()):
             coletado["almanaque"] = [item_almanaque(almanaque)]
         else:
             motivos.setdefault("almanaque", "sem dados na janela")
-    if "letterboxd" in usadas:
-        motivos["letterboxd"] = "coletor não implementado"
-
     novos += [{"tipo": "escolha", "url": it["url"], "titulo": it["titulo"], "fonte": it["fonte"],
                "data": hoje.isoformat(), **({"pageid": it["pageid"]} if "pageid" in it else {})}
               for it in escolha_itens]

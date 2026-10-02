@@ -34,7 +34,7 @@ def item_curiosidade(tema, art):
             "url": art["url"], "html": art["html"], "chars": art["chars"],
             "lang": "pt", "data": "", "imagem": art.get("imagem"),
             "credito": f'Fonte: Wikipédia — <a href="{u}">{u}</a> (CC BY-SA 4.0).{img_credito}',
-            "nota": "", "pageid": art["pageid"]}
+            "nota": art.get("nota", ""), "pageid": art["pageid"]}
 
 
 def item_externo(fonte_id, it):

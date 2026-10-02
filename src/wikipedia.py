@@ -154,23 +154,47 @@ def avaliar_qualidade_ores(sessao, revid, timeout):
     return int(classe), None
 
 
+def _configurar_ores(cfg):
+    filtro = cfg.get("filtro_qualidade", {})
+    if not filtro.get("ativar", False):
+        return None, filtro.get("timeout", 10)
+    nome_classe = str(filtro.get("classe_minima", "B")).upper()
+    if nome_classe not in CLASSES_QUALIDADE:
+        raise ValueError(f"classe mínima ORES inválida: {nome_classe}")
+    timeout = filtro.get("timeout", 10)
+    if (isinstance(timeout, bool) or not isinstance(timeout, (int, float))
+            or not math.isfinite(timeout) or timeout <= 0):
+        raise ValueError("timeout do ORES deve ser um número positivo")
+    return CLASSES_QUALIDADE[nome_classe], timeout
+
+
+def _aceitavel_com_ores(sessao, art, classe_minima, timeout):
+    if classe_minima is None:
+        return True
+    classe, erro = avaliar_qualidade_ores(sessao, art.get("revid"), timeout)
+    if erro:
+        logger.warning(
+            "ORES indisponível para '%s'; aceitando candidato sem filtro de qualidade: %s",
+            art["titulo"], erro,
+        )
+        return True
+    return classe is not None and classe >= classe_minima
+
+
+def artigo_aceitavel(sessao, cfg, art):
+    """Aplica tamanho mínimo e filtro ORES a um candidato já carregado."""
+    if art["chars"] < cfg["min_caracteres"]:
+        return False
+    classe_minima, timeout = _configurar_ores(cfg)
+    return _aceitavel_com_ores(sessao, art, classe_minima, timeout)
+
+
 # ---------------------------------------------------------------- Sorteio
 
 def sortear_artigo(sessao, cfg, categorias, usados, usados_ids, rng):
     """Escolhe uma raiz, desce aleatoriamente por subcategorias até achar um artigo aceitável."""
     ignorados = tuple(cfg["titulos_ignorados_prefixos"])
-    filtro = cfg.get("filtro_qualidade", {})
-    filtro_ativo = filtro.get("ativar", False)
-    classe_minima = None
-    timeout_ores = filtro.get("timeout", 10)
-    if filtro_ativo:
-        nome_classe = str(filtro.get("classe_minima", "B")).upper()
-        if nome_classe not in CLASSES_QUALIDADE:
-            raise ValueError(f"classe mínima ORES inválida: {nome_classe}")
-        classe_minima = CLASSES_QUALIDADE[nome_classe]
-        if (isinstance(timeout_ores, bool) or not isinstance(timeout_ores, (int, float))
-                or not math.isfinite(timeout_ores) or timeout_ores <= 0):
-            raise ValueError("timeout do ORES deve ser um número positivo")
+    classe_minima, timeout_ores = _configurar_ores(cfg)
     for _ in range(cfg["tentativas"]):
         cat = rng.choice(categorias)
         caminho = [cat]
@@ -192,15 +216,8 @@ def sortear_artigo(sessao, cfg, categorias, usados, usados_ids, rng):
             if art and art["pageid"] in usados_ids:
                 break  # redirecionou para um artigo já publicado: novo sorteio
             if art and art["chars"] >= cfg["min_caracteres"]:
-                if filtro_ativo:
-                    classe, erro = avaliar_qualidade_ores(sessao, art.get("revid"), timeout_ores)
-                    if erro:
-                        logger.warning(
-                            "ORES indisponível para '%s'; aceitando candidato sem filtro de qualidade: %s",
-                            art["titulo"], erro,
-                        )
-                    elif classe is not None and classe < classe_minima:
-                        break
+                if not _aceitavel_com_ores(sessao, art, classe_minima, timeout_ores):
+                    break
                 art["caminho"] = " › ".join(caminho)
                 return art
             break  # artigo curto/vazio: novo sorteio
