@@ -1,4 +1,4 @@
-"""Orquestração: coleta de todas as seções -> epub -> histórico."""
+"""Orquestração: layout -> coleta das fontes usadas -> seções -> epub -> histórico/relatório."""
 import datetime as dt
 import random
 import sys
@@ -10,6 +10,9 @@ from .epub_builder import montar_epub
 from .escolha import coletar_escolhas, consumir_fila
 from .feeds import coletar_noticias
 from .historico import caminho_historico, carregar_historico, salvar_historico
+from .itens import item_curiosidade, item_editor, item_externo
+from .layout import ErroLayout, fontes_usadas, montar_secoes, resolver_layout
+from .relatorio import dados_relatorio, gravar_relatorio, resumo_texto
 from .wikipedia import sortear_artigo
 
 
@@ -23,21 +26,26 @@ def numero_da_edicao(cfg, hoje):
     return (hoje - primeira).days // 7 + 1
 
 
-def coletar_curiosidades(sessao, cfg, usados, usados_ids, rng, hoje):
-    """Um artigo da Wikipedia por tema. Devolve (artigos, registros_novos, temas_pulados)."""
+def coletar_curiosidades(sessao, cfg, usados, usados_ids, rng, hoje, temas=None):
+    """Um artigo da Wikipedia por tema (`temas`: {tema: categorias}; padrão: todos de cfg["temas"]).
+
+    Devolve (artigos, registros_novos, pulados), com `pulados` = {tema: motivo}.
+    Os temas são sorteados na ordem de `cfg["temas"]` (não na das seções): --semente segue reprodutível.
+    """
     wcfg = {**cfg["wikipedia"], "imagens": cfg.get("imagens", {"ativar": False})}
-    artigos, novos, pulados = [], [], []
-    for tema, cats in cfg["temas"].items():
+    temas = cfg["temas"] if temas is None else temas
+    artigos, novos, pulados = [], [], {}
+    for tema, cats in temas.items():
         print(f"[{tema}] sorteando...", end=" ", flush=True)
         try:
             art = sortear_artigo(sessao, wcfg, cats, usados, usados_ids, rng)
         except requests.RequestException as e:
             print(f"falha de rede ({e})")
-            pulados.append(tema)
+            pulados[tema] = "falha de rede"
             continue
         if art is None:
             print("nenhum artigo novo encontrado — tema pulado")
-            pulados.append(tema)
+            pulados[tema] = "esgotada"
             continue
         usados.add(art["titulo"])
         usados_ids.add(art["pageid"])
@@ -49,18 +57,27 @@ def coletar_curiosidades(sessao, cfg, usados, usados_ids, rng, hoje):
     return artigos, novos, pulados
 
 
-def coletar_secao_noticias(sessao, cfg, usados_urls, agora):
+def _noticias_ativas(cfg):
     ncfg = cfg.get("noticias") or {}
-    if not (ncfg.get("ativar") and (ncfg.get("feeds") or ncfg.get("opml"))):
+    return bool(ncfg.get("ativar") and (ncfg.get("feeds") or ncfg.get("opml")))
+
+
+def _dw_ativa(cfg):
+    dcfg = cfg.get("dw") or {}
+    return bool(dcfg.get("ativar") and dcfg.get("feed"))
+
+
+def coletar_secao_noticias(sessao, cfg, usados_urls, agora):
+    if not _noticias_ativas(cfg):
         return []
     print("\n[Notícias] coletando...")
-    return coletar_noticias(sessao, ncfg, usados_urls, agora)
+    return coletar_noticias(sessao, cfg.get("noticias") or {}, usados_urls, agora)
 
 
 def coletar_secao_dw(sessao, cfg, usados_urls, agora):
-    dcfg = cfg.get("dw") or {}
-    if not (dcfg.get("ativar") and dcfg.get("feed")):
+    if not _dw_ativa(cfg):
         return []
+    dcfg = cfg.get("dw") or {}
     print("\n[DW] coletando...")
     return coletar_noticias(sessao, {
         "feeds": [{"nome": "DW · Top-Thema mit Vokabeln", "url": dcfg["feed"]}],
@@ -73,6 +90,13 @@ def coletar_secao_dw(sessao, cfg, usados_urls, agora):
 
 
 def gerar_edicao(sessao, cfg, semente=None, usar_hist=True, escolhas=()):
+    # Layout primeiro: qualquer erro de configuração falha antes de qualquer requisição de rede.
+    try:
+        layout = resolver_layout(cfg)
+    except ErroLayout as e:
+        sys.exit(str(e))
+    usadas = fontes_usadas(layout)
+
     hoje = dt.date.today()
     agora = dt.datetime.now(dt.timezone.utc)
 
@@ -86,19 +110,44 @@ def gerar_edicao(sessao, cfg, semente=None, usar_hist=True, escolhas=()):
     usados_ids = {r["pageid"] for r in registros if "pageid" in r}
     usados_urls = {r["url"] for r in registros if "url" in r}
 
+    coletado, motivos = {}, {}
+
     # Escolha do editor primeiro: o que foi escolhido à mão não pode ser sorteado de novo
     # (nem repetido nas notícias). Não consome o `rng`, então --semente continua reprodutível.
-    escolha_itens, fila = coletar_escolhas(sessao, cfg, escolhas, registros)
-    for it in escolha_itens:
-        usados_urls.add(it["url"])
-        if "pageid" in it:                       # só artigos da wiki do sorteio automático
-            usados.add(it["titulo"])
-            usados_ids.add(it["pageid"])
+    escolha_itens, fila = [], {"publicados": set()}
+    if "editor" in usadas:
+        escolha_itens, fila = coletar_escolhas(sessao, cfg, escolhas, registros)
+        for it in escolha_itens:
+            usados_urls.add(it["url"])
+            if "pageid" in it:                       # só artigos da wiki do sorteio automático
+                usados.add(it["titulo"])
+                usados_ids.add(it["pageid"])
+        coletado["editor"] = [item_editor(it) for it in escolha_itens]
+        if not escolha_itens:
+            motivos["editor"] = "fila vazia ou links com falha"
+    elif escolhas:
+        print("Aviso: --escolha ignorado, pois 'editor' não está em nenhuma seção do layout.")
 
     rng = random.Random(semente)
-    artigos, novos, pulados = coletar_curiosidades(sessao, cfg, usados, usados_ids, rng, hoje)
-    noticias = coletar_secao_noticias(sessao, cfg, usados_urls, agora)
-    dw = coletar_secao_dw(sessao, cfg, usados_urls, agora)
+    temas_usados = {t: c for t, c in (cfg.get("temas") or {}).items() if t in usadas}
+    artigos, novos, pulados = coletar_curiosidades(sessao, cfg, usados, usados_ids, rng, hoje, temas_usados)
+    for tema, art in artigos:
+        coletado[tema] = [item_curiosidade(tema, art)]
+    motivos.update(pulados)
+
+    noticias, dw = [], []
+    if "noticias" in usadas:
+        noticias = coletar_secao_noticias(sessao, cfg, usados_urls, agora)
+        coletado["noticias"] = [item_externo("noticias", it) for it in noticias]
+        if not noticias:
+            motivos["noticias"] = "sem itens na janela" if _noticias_ativas(cfg) else "desativada"
+    if "dw" in usadas:
+        dw = coletar_secao_dw(sessao, cfg, usados_urls, agora)
+        coletado["dw"] = [item_externo("dw", it) for it in dw]
+        if not dw:
+            motivos["dw"] = "sem itens na janela" if _dw_ativa(cfg) else "desativada"
+    if "letterboxd" in usadas:
+        motivos["letterboxd"] = "coletor não implementado"
 
     novos += [{"tipo": "escolha", "url": it["url"], "titulo": it["titulo"], "fonte": it["fonte"],
                "data": hoje.isoformat(), **({"pageid": it["pageid"]} if "pageid" in it else {})}
@@ -107,23 +156,34 @@ def gerar_edicao(sessao, cfg, semente=None, usar_hist=True, escolhas=()):
                "fonte": it["fonte"], "data": hoje.isoformat()}
               for tipo, itens in (("noticia", noticias), ("dw", dw)) for it in itens]
 
-    if not (escolha_itens or artigos or noticias or dw):
+    if not any(coletado.values()):
         sys.exit("Nada obtido; epub não gerado.")
 
+    secoes = montar_secoes(layout, coletado, motivos)
+    # A semente da capa vem só dos artigos sorteados (não do editor/notícias/DW), como antes.
+    curiosidades = [(tema, art["titulo"], art["pageid"]) for tema, art in artigos]
+
     destino = resolver_caminho(cfg["saida"]) / f"jornal_{hoje.isoformat()}.epub"
-    info_capa = montar_epub(cfg, artigos, hoje, destino, numero_da_edicao(cfg, hoje),
-                            noticias, dw, escolhas=escolha_itens)
+    numero = numero_da_edicao(cfg, hoje)
+    info_capa = montar_epub(cfg, secoes, hoje, destino, numero, curiosidades)
     if usar_hist:
         salvar_historico(caminho_hist, registros + novos)   # só depois do epub gerado com sucesso
         consumir_fila(fila)                                 # idem: a fila só esvazia após publicar
     elif fila["publicados"]:
         print("(--sem-historico: a fila de escolhas foi mantida)")
 
+    rcfg = {"ativar": True, "pasta": "relatorios", **(cfg.get("relatorio") or {})}
+    rel = gravar_relatorio(rcfg, dados_relatorio(secoes, hoje, numero, destino.name), destino.stem)
+
     print(f"\nEpub gerado: {destino}  ({len(escolha_itens)} escolha(s) do editor, {len(noticias)} notícias, "
           f"{len(artigos)} curiosidades, {len(dw)} da DW)")
     print(f"Capa: semente {info_capa['semente']}, {info_capa['niveis']} níveis, "
           f"{info_capa['faixas_cinza']} faixas de cinza")
+    print(resumo_texto(secoes))
+    if rel:
+        print(f"Relatório: {rel}")
     if pulados:
-        print("ATENÇÃO — temas sem artigo nesta edição: " + ", ".join(pulados)
+        print("ATENÇÃO — temas sem artigo nesta edição: "
+              + ", ".join(f"{t} ({m})" for t, m in pulados.items())
               + "\n  (categorias esgotadas ou falha de rede; considere adicionar mais raízes no config.yaml)")
     return destino

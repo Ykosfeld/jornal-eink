@@ -1,10 +1,10 @@
-"""Montagem do .epub (capa, capítulos, TOC, spine)."""
+"""Montagem do .epub (capa, seções, capítulos, TOC, spine). Não conhece fontes nem config de fontes."""
 import html
-from urllib.parse import urlsplit
 
 from ebooklib import epub
 
 from .capa import gerar_capa, html_controle
+from .relatorio import html_estrutura, html_secao_vazia
 
 CSS = """
 body { font-family: serif; line-height: 1.4; margin: 0 0.5em; }
@@ -35,75 +35,31 @@ def capitulo(arquivo, titulo, corpo, css, lang="pt"):
     return c
 
 
-def _capitulos_externos(livro, css, prefixo, itens):
-    """Capítulos de notícias e DW (itens vindos de feeds.py)."""
-    caps = []
-    for i, it in enumerate(itens, 1):
-        u = html.escape(it["url"])
-        rotulo = html.escape(it["fonte"]) + (f' · {it["data"]}' if it["data"] else "")
-        corpo = (f'<p class="tema">{rotulo}</p><h1>{html.escape(it["titulo"])}</h1>{it["html"]}'
-                 f'<p class="fonte">Fonte: <a href="{u}">{u}</a></p>')
-        c = capitulo(f"{prefixo}_{i:02d}.xhtml", f'{it["fonte"]}: {it["titulo"]}', corpo, css, it["lang"])
-        livro.add_item(c)
-        caps.append(c)
-    return caps
+def _capitulo_item(livro, css, it, n):
+    """Um capítulo a partir de um item uniforme (ver src/itens.py). `n` = contador global."""
+    nota = (f'<p class="nota">Nota do editor: <i>{html.escape(it["nota"])}</i></p>'
+            if it.get("nota") else "")
+    img_html = ""
+    if it.get("imagem"):
+        nome_img = f"img/item_{n:03d}.jpg"
+        livro.add_item(epub.EpubItem(uid=f"img_item_{n:03d}", file_name=nome_img,
+                                     media_type="image/jpeg", content=it["imagem"]["bytes"]))
+        img_html = (f'<p class="imagem"><img src="{nome_img}" '
+                    f'alt="{html.escape(it["titulo"], quote=True)}"/></p>')
+    corpo = (f'<p class="tema">{html.escape(it["rotulo"])}</p><h1>{html.escape(it["titulo"])}</h1>'
+             f'{nota}{img_html}{it["html"]}<p class="fonte">{it["credito"]}</p>')
+    c = capitulo(f"item_{n:03d}.xhtml", it["titulo_toc"], corpo, css, it["lang"])
+    livro.add_item(c)
+    return c
 
 
-def _capitulos_escolha(livro, css, itens):
-    """Escolha do Editor (itens de escolha.py): Wikipédia (com imagem) ou qualquer site, nota opcional."""
-    caps = []
-    for i, it in enumerate(itens, 1):
-        u = html.escape(it["url"])
-        rotulo = html.escape(it["fonte"]) + (f' · {it["data"]}' if it.get("data") else "")
-        nota = (f'<p class="nota">Nota do editor: <i>{html.escape(it["nota"])}</i></p>'
-                if it.get("nota") else "")
-        img_html, img_credito = "", ""
-        if it.get("imagem"):
-            nome_img = f"img/esc_{i:02d}.jpg"
-            livro.add_item(epub.EpubItem(uid=f"img_esc_{i:02d}", file_name=nome_img,
-                                         media_type="image/jpeg", content=it["imagem"]["bytes"]))
-            img_html = (f'<p class="imagem"><img src="{nome_img}" '
-                        f'alt="{html.escape(it["titulo"], quote=True)}"/></p>')
-            arq = it["imagem"]["arquivo"]
-            if arq:
-                link = f"https://{urlsplit(it['url']).netloc}/wiki/File:" + arq.replace(" ", "_")
-                img_credito = f' Imagem: <a href="{html.escape(link)}">página do arquivo</a> (Wikimedia).'
-        licenca = " (CC BY-SA 4.0)." if it.get("wikipedia") else ""
-        corpo = (f'<p class="tema">{rotulo}</p><h1>{html.escape(it["titulo"])}</h1>{nota}{img_html}{it["html"]}'
-                 f'<p class="fonte">Fonte: {html.escape(it["fonte"])} — <a href="{u}">{u}</a>'
-                 f'{licenca}{img_credito}</p>')
-        c = capitulo(f"esc_{i:02d}.xhtml", f'{it["fonte"]}: {it["titulo"]}', corpo, css, it["lang"])
-        livro.add_item(c)
-        caps.append(c)
-    return caps
+def montar_epub(cfg, secoes, data, destino, numero_edicao=None, curiosidades=()):
+    """Monta o epub. Devolve o `info` da capa (semente, níveis etc.) para log.
 
-
-def _capitulos_wikipedia(livro, css, artigos):
-    caps = []
-    for i, (tema, art) in enumerate(artigos, 1):
-        img_html, img_credito = "", ""
-        if art.get("imagem"):
-            nome_img = f"img/cur_{i:02d}.jpg"
-            livro.add_item(epub.EpubItem(uid=f"img_{i:02d}", file_name=nome_img,
-                                         media_type="image/jpeg", content=art["imagem"]["bytes"]))
-            img_html = (f'<p class="imagem"><img src="{nome_img}" '
-                        f'alt="{html.escape(art["titulo"], quote=True)}"/></p>')
-            arq = art["imagem"]["arquivo"]
-            if arq:
-                link = "https://pt.wikipedia.org/wiki/Ficheiro:" + arq.replace(" ", "_")
-                img_credito = f' Imagem: <a href="{html.escape(link)}">página do arquivo</a> (Wikimedia).'
-        corpo = (f'<p class="tema">{html.escape(tema)}</p>'
-                 f'<h1>{html.escape(art["titulo"])}</h1>{img_html}{art["html"]}'
-                 f'<p class="fonte">Fonte: Wikipédia — <a href="{html.escape(art["url"])}">{html.escape(art["url"])}</a>'
-                 f' (CC BY-SA 4.0).{img_credito}</p>')
-        c = capitulo(f"cur_{i:02d}.xhtml", f'{tema}: {art["titulo"]}', corpo, css)
-        livro.add_item(c)
-        caps.append(c)
-    return caps
-
-
-def montar_epub(cfg, artigos, data, destino, numero_edicao=None, noticias=(), dw=(), escolhas=()):
-    """Monta o epub. Devolve o `info` da capa (semente, níveis etc.) para log."""
+    secoes:        resultado de layout.montar_secoes (cada uma com "nome", "itens", "fontes", "ordem")
+    curiosidades:  [(tema, titulo, pageid)] dos artigos SORTEADOS da Wikipédia. Só eles alimentam a semente
+                   da capa (como antes), então reorganizar seções não muda o desenho.
+    """
     livro = epub.EpubBook()
     livro.set_identifier(f"jornal-{data.isoformat()}")
     livro.set_title(f"{cfg['titulo']} — {data.strftime('%d/%m/%Y')}")
@@ -113,29 +69,33 @@ def montar_epub(cfg, artigos, data, destino, numero_edicao=None, noticias=(), dw
     css = epub.EpubItem(uid="estilo", file_name="estilo.css", media_type="text/css", content=CSS)
     livro.add_item(css)
 
-    # Capa generativa: a semente sai dos pageids dos artigos da Wikipedia + data.
-    # (Escolha do editor, notícias e DW não entram: mudariam o desenho se a coleta variasse.)
-    png_capa, info_capa = gerar_capa(cfg["titulo"], data, [a["pageid"] for _, a in artigos], numero_edicao)
+    png_capa, info_capa = gerar_capa(cfg["titulo"], data, [p for _, _, p in curiosidades], numero_edicao)
     livro.set_cover("capa.png", png_capa, create_page=False)   # capa dos metadados (biblioteca do X4)
     capa = capitulo("capa.xhtml", "Capa",
                     f'<div class="capa"><img src="capa.png" alt="{html.escape(cfg["titulo"], quote=True)}"/></div>',
                     css)
     livro.add_item(capa)
 
-    caps_esc = _capitulos_escolha(livro, css, escolhas)
-    caps_not = _capitulos_externos(livro, css, "not", noticias)
-    caps_wiki = _capitulos_wikipedia(livro, css, artigos)
-    caps_dw = _capitulos_externos(livro, css, "dw", dw)
+    grupos, n, vazias = [], 0, 0
+    for s in secoes:
+        if s["itens"]:
+            caps = []
+            for it in s["itens"]:
+                n += 1
+                caps.append(_capitulo_item(livro, css, it, n))
+        else:
+            vazias += 1
+            c = capitulo(f"vazia_{vazias:02d}.xhtml", "Sem itens nesta edição", html_secao_vazia(s), css)
+            livro.add_item(c)
+            caps = [c]
+        grupos.append((s["nome"], caps))
 
-    # Última página: dados de controle da capa (semente, níveis...) só para curiosidade/depuração.
+    # Última página: dados de controle da capa (semente, níveis...) + estrutura da edição.
     controle = capitulo("controle.xhtml", "Nota de controle",
-                        html_controle(info_capa, [(t, a["titulo"], a["pageid"]) for t, a in artigos]),
-                        css)
+                        html_controle(info_capa, list(curiosidades)) + html_estrutura(secoes), css)
     livro.add_item(controle)
 
-    grupos = [("Escolha do Editor", caps_esc), ("Notícias", caps_not),
-              ("Curiosidades", caps_wiki), ("Deutsch üben", caps_dw)]
-    livro.toc = [capa] + [(epub.Section(nome), cs) for nome, cs in grupos if cs] + [controle]
+    livro.toc = [capa] + [(epub.Section(nome), cs) for nome, cs in grupos] + [controle]
     livro.add_item(epub.EpubNcx())
     livro.add_item(epub.EpubNav())
     livro.spine = [capa, "nav"] + [c for _, cs in grupos for c in cs] + [controle]

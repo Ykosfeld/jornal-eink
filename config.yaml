@@ -135,3 +135,45 @@ escolha_do_editor:
   max_caracteres: 30000
   min_caracteres: 300      # abaixo disso: provável paywall
   lang: pt                 # idioma assumido se a página não declarar
+
+# ---------------------------------------------------------------------------
+# Layout do jornal: seções (colunas) × fontes. ACRESCENTAR ao final do config.yaml.
+# Fontes válidas: qualquer chave de `temas:` + as reservadas: editor, noticias, dw (letterboxd: futuro).
+# Cada fonte só pode aparecer uma vez. Ordem das seções no epub = ordem desta lista.
+# `ordem` (opcional): sequencial (padrão: todos os itens da 1ª fonte, depois da 2ª...)
+#                     intercalar (round-robin entre as fontes)
+# Tema que não aparece em nenhuma seção não é sorteado nem entra no histórico.
+# Valide sem rede com:  python main.py --validar-layout
+# ---------------------------------------------------------------------------
+# Padrão (equivalente ao comportamento anterior). Sem esta chave, o código usa o mesmo layout em memória.
+#secoes:
+#  - nome: Escolha do Editor
+#    fontes: [editor]
+#  - nome: Notícias
+#    fontes: [noticias]
+#  - nome: Curiosidades
+#    fontes: [Matemática, Física, Astronomia, Ciências, Música, Música clássica, Aves, Computação, Video games, Arte, Cinema]
+#  - nome: Deutsch üben
+#    fontes: [dw]
+ 
+# Exemplo de layout por assunto (troque pelo bloco acima para usar):
+secoes:
+   - nome: Escolha do Editor
+     fontes: [editor]
+   - nome: Atualidades
+     fontes: [noticias]
+   - nome: Cultura
+     fontes: [Música, Música clássica, Cinema, Arte]
+     ordem: intercalar
+   - nome: Ciência
+     fontes: [Matemática, Física, Astronomia, Ciências, Aves]
+   - nome: Tecnologia
+     fontes: [Computação, Video games]
+   - nome: Deutsch üben
+     fontes: [dw]
+ 
+# Relatório JSON de cada edição (seções, itens por fonte, fontes sem item).
+# Fica FORA de `saida` por padrão, para não aparecer no catálogo OPDS. Caminho relativo = raiz do repo.
+relatorio:
+  ativar: true
+  pasta: relatorios
