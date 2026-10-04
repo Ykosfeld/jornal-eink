@@ -9,3 +9,6 @@
 - [x] ~~Formatar e dar mais cara de jornal~~
 - [x] ~~Colocar a opção de pegar um artigo da wikipedia selecionado manualmente e chama-lo de escolha do editor~~
 - [x] ~~Obituário, feriados e curiosidades da página inicial da Wikipédia (Almanaque)~~
+- [x] ~~Migrar filtro de qualidade de ORES para Lift Wing, com disjuntor e métricas~~
+- [x] ~~Arquivar edições antigas fora da raiz de `saida`~~
+- [x] ~~Adicionar sumário com tempo de leitura e divisórias de seção~~

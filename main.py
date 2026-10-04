@@ -15,12 +15,14 @@ Uso:
 """
 import argparse
 import sys
+import time
 
 from src.config import carregar_config, criar_sessao
 from src.feeds import validar_feeds
 from src.layout import ErroLayout, imprimir_layout, resolver_layout
 from src.pipeline import gerar_edicao
-from src.wikipedia import validar_categorias
+from src.qualidade import FiltroQualidade, avaliar_qualidade
+from src.wikipedia import buscar_artigo, validar_categorias
 
 
 def main():
@@ -30,6 +32,8 @@ def main():
     ap.add_argument("--validar-feeds", action="store_true", help="só testa os feeds (notícias e DW)")
     ap.add_argument("--validar-layout", action="store_true",
                     help="só valida o layout de seções e imprime o resumo (sem rede)")
+    ap.add_argument("--validar-qualidade", nargs="*", metavar="TÍTULO",
+                    help="avalia títulos da Wikipédia com o backend de qualidade")
     ap.add_argument("--semente", type=int, help="semente do sorteio (reprodutível)")
     ap.add_argument("--sem-historico", action="store_true",
                     help="não lê nem grava o histórico, e não esvazia a fila de escolhas (use em testes)")
@@ -44,6 +48,23 @@ def main():
             imprimir_layout(resolver_layout(cfg))
         except ErroLayout as e:
             sys.exit(str(e))
+        return
+
+    if args.validar_qualidade is not None:
+        wcfg = {**cfg["wikipedia"], "imagens": {"ativar": False}}
+        titulos = args.validar_qualidade or ["Brasil", "Esboço"]
+        filtro = FiltroQualidade(cfg["wikipedia"])
+        sessao = criar_sessao()
+        for titulo in titulos:
+            inicio = time.perf_counter()
+            artigo = buscar_artigo(sessao, wcfg, titulo)
+            if not artigo:
+                print(f"{titulo}: artigo não encontrado")
+                continue
+            classe, erro = avaliar_qualidade(sessao, artigo.get("revid"), filtro.config)
+            latencia = (time.perf_counter() - inicio) * 1000
+            resultado = f"classe {classe}" if erro is None else f"erro: {erro}"
+            print(f"{titulo}: {resultado} · backend {filtro.config['backend']} · {latencia:.0f} ms")
         return
 
     sessao = criar_sessao()

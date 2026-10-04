@@ -36,6 +36,7 @@ python main.py                                  # gera a edição da semana
 python main.py --validar                        # testa as categorias da Wikipédia do config
 python main.py --validar-feeds                  # testa os feeds de notícias e da DW
 python main.py --semente 42 --sem-historico     # teste reprodutível, sem mexer no histórico
+python main.py --validar-qualidade               # fumaça do backend Lift Wing
 ```
 
 O epub é salvo em `saida/` (configurável) com o nome `jornal_AAAA-MM-DD.epub`.
@@ -49,7 +50,7 @@ Tudo fica no `config.yaml`:
 | `titulo`, `autor`, `idioma` | Metadados do epub e título da capa |
 | `primeira_edicao` | Data da edição nº 1 (a capa mostra "Nº N") |
 | `saida` | Pasta de destino dos epubs |
-| `wikipedia` | Tamanho mínimo/máximo, profundidade de busca e classe mínima de qualidade ORES |
+| `wikipedia` | Tamanho mínimo/máximo, profundidade de busca e classe mínima de qualidade Lift Wing |
 | `temas` | Temas e categorias-raiz da Wikipédia usadas no sorteio |
 | `imagens` | Tamanho e qualidade das imagens (ajustados para e-ink) |
 | `noticias` | Feeds/OPML, itens por feed e janela de dias |
@@ -58,20 +59,29 @@ Tudo fica no `config.yaml`:
 | `personalizacao_cultural.letterboxd` | Prioriza artigos de Cinema pelos filmes assistidos, nota, data e créditos na Wikipédia |
 | `secoes` | Fontes de cada seção e ordem no epub; coloque `almanaque` primeiro para exibi-lo logo após a capa |
 | `historico` | Arquivo do histórico e por quanto tempo lembrar |
+| `arquivo_morto` | Mantém edições recentes na raiz de `saida` e arquiva as demais |
+| `leitura` | Caracteres por minuto usados nos tempos estimados |
+| `sumario` | Ativa o capítulo "Nesta edição" após a capa |
+| `divisorias` | Ativa páginas divisórias por seção e define o mínimo de itens |
 
 Para ativar a personalização de Cinema, defina `personalizacao_cultural.ativar`
 e `personalizacao_cultural.letterboxd.ativar` como `true` e configure
 `feed_url` com a URL RSS do seu perfil. Por padrão são considerados os filmes
 assistidos nos últimos 7 dias, ordenados por nota e depois pela data assistida.
-Os artigos relacionados respeitam o histórico e o filtro ORES; se não houver
+Os artigos relacionados respeitam o histórico e o filtro Lift Wing; se não houver
 uma relação elegível ou o feed falhar, o sorteio normal continua como fallback.
 
-O filtro ORES do sorteio de artigos é configurável em `wikipedia.filtro_qualidade`.
+O filtro Lift Wing do sorteio de artigos é configurável em `wikipedia.filtro_qualidade`.
 Ele avalia a revisão atual do candidato (classes Stub, Start, C, B, GA e FA) e,
 por padrão, aceita B ou superior. Candidatos abaixo do limiar são descartados e
-o sorteio tenta outro; se o serviço ORES falhar, o artigo segue pelos critérios
-atuais e um aviso é registrado. Use `ativar: false` para desligar o filtro. Se a
-opção não estiver configurada, o sorteio mantém o comportamento anterior.
+o sorteio tenta outro; se o serviço falhar, um disjuntor aceita candidatos sem
+filtro pelo restante da edição e registra isso no relatório. Use `ativar: false`
+para desligar o filtro. O token opcional fica em `WIKIMEDIA_API_TOKEN`, nunca no
+`config.yaml`.
+
+O arquivo morto só roda após uma publicação normal. A raiz de `saida` fica com
+a edição atual; as demais são movidas para `saida/anteriores`, que aparece como
+subpasta no catálogo OPDS. `--sem-historico` não move arquivos.
 
 ## Automação e entrega
 
@@ -92,6 +102,9 @@ src/
   almanaque.py      # coleta de efemérides e destaques da Wikipédia
   pipeline.py        # orquestra coleta -> epub -> histórico
   itens.py           # adapta coletores ao formato uniforme de seção
+  qualidade.py       # filtro Lift Wing por edição
+  leitura.py         # estimativa uniforme de tempo de leitura
+  arquivo.py         # rotação de edições publicadas
   layout.py          # valida fontes e ordena seções configuráveis
   wikipedia.py       # sorteio e limpeza de artigos
   feeds.py           # notícias (RSS/OPML) e DW
@@ -99,6 +112,9 @@ src/
   capa.py            # capa generativa
   epub_builder.py    # montagem do epub
   historico.py       # controle de itens já publicados
+  escolha.py         # escolhas do editor
+  letterboxd.py      # personalização cultural de Cinema
+  relatorio.py       # relatório JSON e resumo
 docs/TODO.md         # ideias e pendências
 ```
 

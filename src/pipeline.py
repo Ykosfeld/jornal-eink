@@ -6,6 +6,7 @@ import sys
 import requests
 
 from .almanaque import coletar_almanaque
+from .arquivo import arquivar, validar_config as validar_arquivo_config
 from .config import resolver_caminho
 from .epub_builder import montar_epub
 from .escolha import coletar_escolhas, consumir_fila
@@ -14,6 +15,7 @@ from .historico import caminho_historico, carregar_historico, salvar_historico
 from .itens import item_almanaque, item_curiosidade, item_editor, item_externo
 from .layout import ErroLayout, fontes_usadas, montar_secoes, resolver_layout
 from .letterboxd import priorizar_artigo, validar_config as validar_letterboxd_config
+from .qualidade import FiltroQualidade
 from .relatorio import dados_relatorio, gravar_relatorio, resumo_texto
 from .wikipedia import sortear_artigo
 
@@ -28,7 +30,8 @@ def numero_da_edicao(cfg, hoje):
     return (hoje - primeira).days // 7 + 1
 
 
-def coletar_curiosidades(sessao, cfg, usados, usados_ids, rng, hoje, temas=None, priorizados=None):
+def coletar_curiosidades(sessao, cfg, usados, usados_ids, rng, hoje, temas=None, priorizados=None,
+                         filtro_qualidade=None):
     """Um artigo da Wikipedia por tema (`temas`: {tema: categorias}; padrão: todos de cfg["temas"]).
 
     Devolve (artigos, registros_novos, pulados), com `pulados` = {tema: motivo}.
@@ -46,7 +49,9 @@ def coletar_curiosidades(sessao, cfg, usados, usados_ids, rng, hoje, temas=None,
             print(f"[{tema}] sorteando...", end=" ", flush=True)
         try:
             if art is None:
-                art = sortear_artigo(sessao, wcfg, cats, usados, usados_ids, rng)
+                art = sortear_artigo(
+                    sessao, wcfg, cats, usados, usados_ids, rng, filtro_qualidade,
+                )
         except requests.RequestException as e:
             print(f"falha de rede ({e})")
             pulados[tema] = "falha de rede"
@@ -98,6 +103,7 @@ def coletar_secao_dw(sessao, cfg, usados_urls, agora):
 
 
 def gerar_edicao(sessao, cfg, semente=None, usar_hist=True, escolhas=()):
+    validar_arquivo_config(cfg.get("arquivo_morto"))
     # Layout primeiro: qualquer erro de configuração falha antes de qualquer requisição de rede.
     try:
         layout = resolver_layout(cfg)
@@ -119,6 +125,7 @@ def gerar_edicao(sessao, cfg, semente=None, usar_hist=True, escolhas=()):
     usados_urls = {r["url"] for r in registros if "url" in r}
 
     coletado, motivos = {}, {}
+    filtro_qualidade = FiltroQualidade(cfg["wikipedia"])
 
     # Escolha do editor primeiro: o que foi escolhido à mão não pode ser sorteado de novo
     # (nem repetido nas notícias). Não consome o `rng`, então --semente continua reprodutível.
@@ -144,7 +151,9 @@ def gerar_edicao(sessao, cfg, semente=None, usar_hist=True, escolhas=()):
     if pcfg.get("ativar") and lcfg.get("ativar") and "Cinema" in temas_usados:
         try:
             validar_letterboxd_config(lcfg)
-            art, motivo = priorizar_artigo(sessao, cfg, usados, usados_ids, hoje)
+            art, motivo = priorizar_artigo(
+                sessao, cfg, usados, usados_ids, hoje, filtro_qualidade,
+            )
         except ValueError as e:
             sys.exit(str(e))
         if art:
@@ -153,6 +162,7 @@ def gerar_edicao(sessao, cfg, semente=None, usar_hist=True, escolhas=()):
             print(f"Aviso Letterboxd: {motivo}; usando o sorteio normal de Cinema.")
     artigos, novos, pulados = coletar_curiosidades(
         sessao, cfg, usados, usados_ids, rng, hoje, temas_usados, priorizados,
+        filtro_qualidade,
     )
     for tema, art in artigos:
         coletado[tema] = [item_curiosidade(tema, art)]
@@ -203,15 +213,31 @@ def gerar_edicao(sessao, cfg, semente=None, usar_hist=True, escolhas=()):
     elif fila["publicados"]:
         print("(--sem-historico: a fila de escolhas foi mantida)")
 
+    arquivados = []
+    if usar_hist:
+        arquivados = arquivar(destino.parent, destino, cfg.get("arquivo_morto"))
+    elif (cfg.get("arquivo_morto") or {}).get("ativar"):
+        print("(--sem-historico: arquivo morto não foi executado)")
+
     rcfg = {"ativar": True, "pasta": "relatorios", **(cfg.get("relatorio") or {})}
-    rel = gravar_relatorio(rcfg, dados_relatorio(secoes, hoje, numero, destino.name), destino.stem)
+    rel = gravar_relatorio(
+        rcfg,
+        dados_relatorio(
+            secoes, hoje, numero, destino.name,
+            qualidade=filtro_qualidade.relatorio(), arquivados=arquivados,
+        ),
+        destino.stem,
+    )
 
     print(f"\nEpub gerado: {destino}  ({len(escolha_itens)} escolha(s) do editor, {len(noticias)} notícias, "
           f"{len(artigos)} curiosidades, {len(dw)} da DW, "
           f"{1 if almanaque else 0} Almanaque)")
     print(f"Capa: semente {info_capa['semente']}, {info_capa['niveis']} níveis, "
           f"{info_capa['faixas_cinza']} faixas de cinza")
-    print(resumo_texto(secoes))
+    print(resumo_texto(secoes, filtro_qualidade.relatorio()))
+    if filtro_qualidade.sem_filtro:
+        print("ATENÇÃO — itens aceitos sem filtro de qualidade: "
+              + ", ".join(filtro_qualidade.sem_filtro))
     if rel:
         print(f"Relatório: {rel}")
     if pulados:
