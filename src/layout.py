@@ -35,7 +35,7 @@ def _sugestao(fonte, conhecidas):
 
 
 def validar_layout(cfg, secoes):
-    """Valida `secoes` e devolve a versão normalizada: [{"nome", "fontes", "ordem"}].
+    """Valida `secoes` e devolve a versão normalizada.
 
     Levanta ErroLayout (com todos os problemas) se algo estiver errado.
     """
@@ -66,6 +66,9 @@ def validar_layout(cfg, secoes):
             ordem = "sequencial"
         if ordem not in ORDENS:
             erros.append(f"{rot}: ordem '{ordem}' inválida (use {' ou '.join(ORDENS)})")
+        divisoria = s.get("divisoria", None)
+        if divisoria is not None and not isinstance(divisoria, bool):
+            erros.append(f"{rot}: 'divisoria' deve ser booleana")
 
         fontes = s.get("fontes")
         if not isinstance(fontes, list) or not fontes:
@@ -85,7 +88,7 @@ def validar_layout(cfg, secoes):
                 vistas[f] = rot
         if nome_ok and ordem in ORDENS:
             saida.append({"nome": nome.strip(), "fontes": [f for f in fontes if isinstance(f, str)],
-                          "ordem": ordem})
+                          "ordem": ordem, "divisoria": divisoria})
 
     if erros:
         raise ErroLayout("Layout inválido:\n" + "\n".join(f"  - {e}" for e in erros))
@@ -99,7 +102,8 @@ def resolver_layout(cfg):
         bruto = layout_padrao(cfg)
     secoes = validar_layout(cfg, bruto)
     if "almanaque" not in fontes_usadas(secoes):
-        secoes.append({"nome": "Almanaque", "fontes": ["almanaque"], "ordem": "sequencial"})
+        secoes.append({"nome": "Almanaque", "fontes": ["almanaque"],
+                       "ordem": "sequencial", "divisoria": None})
     return secoes
 
 
@@ -128,7 +132,8 @@ def montar_secoes(secoes, coletado, motivos=None):
         fontes = [{"fonte": f, "itens": len(l), "motivo": None if l else motivos.get(f, "sem itens")}
                   for f, l in zip(s["fontes"], listas)]
         saida.append({"nome": s["nome"], "ordem": s["ordem"], "fontes": fontes,
-                      "itens": ordenar_itens(listas, s["ordem"])})
+                      "itens": ordenar_itens(listas, s["ordem"]),
+                      "divisoria": s.get("divisoria")})
     return saida
 
 

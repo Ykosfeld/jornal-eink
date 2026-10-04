@@ -1,17 +1,14 @@
 """Wikipedia: sorteio de artigos por categoria, limpeza de HTML e imagem de destaque."""
 import io
 import logging
-import math
 import re
 
-import requests
 from bs4 import BeautifulSoup
 from PIL import Image, ImageOps
 
 from .formulas import converter_formulas
 
 logger = logging.getLogger(__name__)
-ORES_API = "https://ores.wikimedia.org/v3/scores/ptwiki/"
 CLASSES_QUALIDADE = {"STUB": 1, "START": 2, "C": 3, "B": 4, "GA": 5, "FA": 6}
 
 SECOES_IGNORADAS = {
@@ -165,72 +162,33 @@ def buscar_artigo(sessao, cfg, titulo):
             "imagem": baixar_imagem(sessao, pag, icfg)}
 
 
-def avaliar_qualidade_ores(sessao, revid, timeout):
-    """Devolve (classe ordinal, erro); erro None indica uma avaliação utilizável."""
-    if revid is None:
-        return None, "ID da revisão ausente"
-    try:
-        resposta = sessao.get(
-            ORES_API,
-            params={"models": "articlequality", "revids": revid},
-            timeout=timeout,
-        )
-        resposta.raise_for_status()
-        dados = resposta.json()
-    except (requests.RequestException, ValueError) as e:
-        return None, str(e)
-
-    try:
-        previsao = dados["ptwiki"]["scores"][str(revid)]["articlequality"]["score"]["prediction"]
-    except (KeyError, TypeError):
-        return None, "resposta sem previsão articlequality"
-    classe = str(previsao)
-    if classe not in {"1", "2", "3", "4", "5", "6"}:
-        return None, f"classe articlequality desconhecida: {classe}"
-    return int(classe), None
-
-
-def _configurar_ores(cfg):
-    filtro = cfg.get("filtro_qualidade", {})
-    if not filtro.get("ativar", False):
-        return None, filtro.get("timeout", 10)
-    nome_classe = str(filtro.get("classe_minima", "B")).upper()
-    if nome_classe not in CLASSES_QUALIDADE:
-        raise ValueError(f"classe mínima ORES inválida: {nome_classe}")
-    timeout = filtro.get("timeout", 10)
-    if (isinstance(timeout, bool) or not isinstance(timeout, (int, float))
-            or not math.isfinite(timeout) or timeout <= 0):
-        raise ValueError("timeout do ORES deve ser um número positivo")
-    return CLASSES_QUALIDADE[nome_classe], timeout
-
-
-def _aceitavel_com_ores(sessao, art, classe_minima, timeout):
-    if classe_minima is None:
-        return True
-    classe, erro = avaliar_qualidade_ores(sessao, art.get("revid"), timeout)
-    if erro:
-        logger.warning(
-            "ORES indisponível para '%s'; aceitando candidato sem filtro de qualidade: %s",
-            art["titulo"], erro,
-        )
-        return True
-    return classe is not None and classe >= classe_minima
-
-
-def artigo_aceitavel(sessao, cfg, art):
-    """Aplica tamanho mínimo e filtro ORES a um candidato já carregado."""
+def artigo_aceitavel(sessao, cfg, art, filtro=None):
+    """Aplica tamanho mínimo e filtro de qualidade a um candidato já carregado."""
     if art["chars"] < cfg["min_caracteres"]:
         return False
-    classe_minima, timeout = _configurar_ores(cfg)
-    return _aceitavel_com_ores(sessao, art, classe_minima, timeout)
+    if filtro is None:
+        from .qualidade import FiltroQualidade
+        filtro = FiltroQualidade(cfg)
+    return filtro.aceitavel(sessao, art)
+
+
+def avaliar_qualidade_liftwing(sessao, revid, timeout, modelo="ptwiki-articlequality"):
+    """Compatibilidade para chamadas diretas ao avaliador Lift Wing."""
+    from .qualidade import avaliar_qualidade
+    return avaliar_qualidade(sessao, revid, {
+        "modelo": modelo,
+        "timeout": timeout,
+    })
 
 
 # ---------------------------------------------------------------- Sorteio
 
-def sortear_artigo(sessao, cfg, categorias, usados, usados_ids, rng):
+def sortear_artigo(sessao, cfg, categorias, usados, usados_ids, rng, filtro=None):
     """Escolhe uma raiz, desce aleatoriamente por subcategorias até achar um artigo aceitável."""
     ignorados = tuple(cfg["titulos_ignorados_prefixos"])
-    classe_minima, timeout_ores = _configurar_ores(cfg)
+    if filtro is None:
+        from .qualidade import FiltroQualidade
+        filtro = FiltroQualidade(cfg)
     for _ in range(cfg["tentativas"]):
         cat = rng.choice(categorias)
         caminho = [cat]
@@ -252,7 +210,7 @@ def sortear_artigo(sessao, cfg, categorias, usados, usados_ids, rng):
             if art and art["pageid"] in usados_ids:
                 break  # redirecionou para um artigo já publicado: novo sorteio
             if art and art["chars"] >= cfg["min_caracteres"]:
-                if not _aceitavel_com_ores(sessao, art, classe_minima, timeout_ores):
+                if not filtro.aceitavel(sessao, art):
                     break
                 art["caminho"] = " › ".join(caminho)
                 return art

@@ -16,8 +16,26 @@ wikipedia:
   mathml: true
   filtro_qualidade:
     ativar: true
-    classe_minima: C       # classes ORES: Stub, Start, C, B, GA, FA
+    classe_minima: C       # classes Lift Wing: Stub, Start, C, B, GA, FA
     timeout: 10            # segundos por avaliação remota
+    backend: liftwing
+    modelo: ptwiki-articlequality
+    falhas_consecutivas_max: 3
+
+# Mantém a edição atual na raiz e coloca as anteriores em uma subpasta.
+arquivo_morto:
+  ativar: true
+  subpasta: anteriores
+  manter_na_raiz: 1
+
+# Sumário e divisórias foram pensados para a tela de e-ink.
+leitura:
+  caracteres_por_minuto: 1000
+sumario:
+  ativar: true
+divisorias:
+  ativar: true
+  minimo_itens: 1
 
 
 # Histórico para nunca repetir artigos entre edições (relativo à pasta do script, se não for absoluto)

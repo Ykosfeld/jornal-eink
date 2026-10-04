@@ -31,7 +31,7 @@ def html_estrutura(secoes):
     return "".join(partes)
 
 
-def dados_relatorio(secoes, data, numero_edicao=None, arquivo=None):
+def dados_relatorio(secoes, data, numero_edicao=None, arquivo=None, qualidade=None, arquivados=None):
     return {
         "data": data.isoformat(),
         "gerado_em": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
@@ -43,6 +43,8 @@ def dados_relatorio(secoes, data, numero_edicao=None, arquivo=None):
                                for f in s["fontes"]]} for s in secoes],
         "fontes_sem_item": [{"secao": s["nome"], "fonte": f["fonte"], "motivo": f["motivo"]}
                             for s in secoes for f in s["fontes"] if not f["itens"]],
+        "qualidade": qualidade or {},
+        "arquivados": list(arquivados or []),
     }
 
 
@@ -59,7 +61,7 @@ def gravar_relatorio(rcfg, dados, nome_base):
     return caminho
 
 
-def resumo_texto(secoes):
+def resumo_texto(secoes, qualidade=None):
     """Linhas para o stdout: itens por seção, com aviso destacado nas vazias."""
     linhas = ["Seções:"]
     for s in secoes:
@@ -69,4 +71,12 @@ def resumo_texto(secoes):
         else:
             motivos = "; ".join(f"{f['fonte']}: {f['motivo']}" for f in s["fontes"])
             linhas.append(f"  !! {s['nome']}: VAZIA — {motivos}")
+    if qualidade:
+        linhas.append(
+            f"Qualidade: {qualidade['backend']} · classe mínima {qualidade['classe_minima']} · "
+            f"{qualidade['avaliados']} avaliados, {qualidade['aprovados']} aprovados, "
+            f"{qualidade['reprovados']} reprovados, {qualidade['falhas']} falhas"
+        )
+        if qualidade["sem_filtro"]:
+            linhas.append("  !! Aceitos sem filtro: " + ", ".join(qualidade["sem_filtro"]))
     return "\n".join(linhas)

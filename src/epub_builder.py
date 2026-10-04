@@ -1,9 +1,11 @@
 """Montagem do .epub (capa, seções, capítulos, TOC, spine). Não conhece fontes nem config de fontes."""
 import html
+import tempfile
 
 from ebooklib import epub
 
 from .capa import gerar_capa, html_controle
+from .leitura import minutos_de_leitura, validar_config as validar_leitura_config
 from .relatorio import html_estrutura, html_secao_vazia
 
 CSS = """
@@ -19,6 +21,11 @@ img { max-width: 100%; height: auto; }
 .imagem { text-align: center; margin: 0.6em 0; }
 .capa { text-align: center; margin: 0; padding: 0; }
 .capa img { width: 100%; height: auto; max-height: 100%; }
+.divisoria { page-break-before: always; text-align: center; margin: 8em 1em; padding: 2em 0; }
+.divisoria h1 { font-size: 1.8em; }
+.divisoria p { text-align: center; }
+.legenda { font-style: italic; }
+.dia { margin-top: 1.2em; }
 table { font-size: 0.85em; border-collapse: collapse; margin: 0.8em 0; }
 td { padding: 0.2em 1em 0.2em 0; vertical-align: top; }
 small { font-size: 0.8em; }
@@ -35,20 +42,58 @@ def capitulo(arquivo, titulo, corpo, css, lang="pt"):
     return c
 
 
-def _capitulo_item(livro, css, it, n):
+def _corpo_item(it, n, livro=None):
     """Um capítulo a partir de um item uniforme (ver src/itens.py). `n` = contador global."""
     nota = (f'<p class="nota">Nota do editor: <i>{html.escape(it["nota"])}</i></p>'
             if it.get("nota") else "")
     img_html = ""
-    if it.get("imagem"):
+    if it.get("imagem") and livro is not None:
         nome_img = f"img/item_{n:03d}.jpg"
         livro.add_item(epub.EpubItem(uid=f"img_item_{n:03d}", file_name=nome_img,
                                      media_type="image/jpeg", content=it["imagem"]["bytes"]))
         img_html = (f'<p class="imagem"><img src="{nome_img}" '
                     f'alt="{html.escape(it["titulo"], quote=True)}"/></p>')
-    corpo = (f'<p class="tema">{html.escape(it["rotulo"])}</p><h1>{html.escape(it["titulo"])}</h1>'
+    return (f'<p class="tema">{html.escape(it["rotulo"])}</p><h1>{html.escape(it["titulo"])}</h1>'
              f'{nota}{img_html}{it["html"]}<p class="fonte">{it["credito"]}</p>')
+
+
+def _capitulo_item(livro, css, it, n):
+    corpo = _corpo_item(it, n, livro)
     c = capitulo(f"item_{n:03d}.xhtml", it["titulo_toc"], corpo, css, it["lang"])
+    livro.add_item(c)
+    return c
+
+
+def _divisoria(livro, css, secao, numero, tempos):
+    total = sum(tempos)
+    if secao["itens"]:
+        corpo = (f'<div class="divisoria"><h1>{html.escape(secao["nome"])}</h1>'
+                 f'<p>{len(secao["itens"])} matéria(s) · ~{total} min</p></div>')
+    else:
+        corpo = html_secao_vazia(secao)
+    c = capitulo(f"secao_{numero:02d}.xhtml", secao["nome"], corpo, css)
+    livro.add_item(c)
+    return c
+
+
+def _sumario(livro, css, cfg, data, numero_edicao, entradas, total):
+    horas, minutos = divmod(total, 60)
+    leitura = f"{minutos} min" if not horas else f"{horas} h {minutos:02d} min"
+    linhas = [
+        f"<h1>Nesta edição</h1>",
+        f"<p>{html.escape(cfg['titulo'])} · {data.strftime('%d/%m/%Y')}"
+        + (f" · Nº {numero_edicao}" if numero_edicao is not None else "") + "</p>",
+        f"<p>Cerca de {leitura} de leitura</p>",
+    ]
+    for nome, itens in entradas:
+        linhas.append(f"<h2>{html.escape(nome)}</h2><ul>")
+        for it, arquivo, minutos in itens:
+            linhas.append(
+                f'<li><a href="{arquivo}">{html.escape(it["titulo"])}</a> — '
+                f'{html.escape(it["fonte"])} · ~{minutos} min</li>'
+            )
+        linhas.append("</ul>")
+    c = capitulo("sumario.xhtml", "Nesta edição", "".join(linhas), css)
     livro.add_item(c)
     return c
 
@@ -76,30 +121,84 @@ def montar_epub(cfg, secoes, data, destino, numero_edicao=None, curiosidades=())
                     css)
     livro.add_item(capa)
 
+    validar_leitura_config(cfg.get("leitura"))
+    sumario_cfg = {"ativar": True, **(cfg.get("sumario") or {})}
+    if not isinstance(sumario_cfg["ativar"], bool):
+        raise ValueError("sumario.ativar deve ser booleano")
+    divisorias_cfg = {"ativar": True, "minimo_itens": 1, **(cfg.get("divisorias") or {})}
+    if not isinstance(divisorias_cfg["ativar"], bool):
+        raise ValueError("divisorias.ativar deve ser booleano")
+    if (isinstance(divisorias_cfg["minimo_itens"], bool)
+            or not isinstance(divisorias_cfg["minimo_itens"], int)
+            or divisorias_cfg["minimo_itens"] < 0):
+        raise ValueError("divisorias.minimo_itens deve ser um inteiro >= 0")
+    cpm = validar_leitura_config(cfg.get("leitura"))
+
+    planos, n = [], 0
+    for secao in secoes:
+        entradas, tempos = [], []
+        for it in secao["itens"]:
+            n += 1
+            minutos = minutos_de_leitura(_corpo_item(it, n), cpm)
+            entradas.append((it, f"item_{n:03d}.xhtml", minutos))
+            tempos.append(minutos)
+        planos.append((secao, entradas, tempos))
+
+    total_leitura = sum(minutos for _, entradas, _ in planos for _, _, minutos in entradas)
+    sumario = None
+    if sumario_cfg["ativar"]:
+        sumario = _sumario(
+            livro, css, cfg, data, numero_edicao,
+            [(s["nome"], entradas) for s, entradas, _ in planos if entradas],
+            total_leitura,
+        )
+
     grupos, n, vazias = [], 0, 0
-    for s in secoes:
+    for indice, (s, entradas, tempos) in enumerate(planos, 1):
+        usar_divisoria = (
+            divisorias_cfg["ativar"] and s.get("divisoria") is not False
+            and (not s["itens"] or len(s["itens"]) >= divisorias_cfg["minimo_itens"])
+        )
+        divisor = _divisoria(livro, css, s, indice, tempos) if usar_divisoria else None
         if s["itens"]:
             caps = []
-            for it in s["itens"]:
+            for it, _, _ in entradas:
                 n += 1
                 caps.append(_capitulo_item(livro, css, it, n))
         else:
-            vazias += 1
-            c = capitulo(f"vazia_{vazias:02d}.xhtml", "Sem itens nesta edição", html_secao_vazia(s), css)
-            livro.add_item(c)
-            caps = [c]
-        grupos.append((s["nome"], caps))
+            if divisor is not None:
+                caps = [divisor]
+            else:
+                vazias += 1
+                c = capitulo(f"vazia_{vazias:02d}.xhtml", "Sem itens nesta edição",
+                             html_secao_vazia(s), css)
+                livro.add_item(c)
+                caps = [c]
+        grupos.append((s["nome"], caps, divisor))
 
     # Última página: dados de controle da capa (semente, níveis...) + estrutura da edição.
     controle = capitulo("controle.xhtml", "Nota de controle",
                         html_controle(info_capa, list(curiosidades)) + html_estrutura(secoes), css)
     livro.add_item(controle)
 
-    livro.toc = [capa] + [(epub.Section(nome), cs) for nome, cs in grupos] + [controle]
+    livro.toc = [capa]
+    if sumario is not None:
+        livro.toc.append(sumario)
+    livro.toc += [
+        (epub.Section(nome, href=divisor.file_name if divisor else None), cs)
+        for nome, cs, divisor in grupos
+    ] + [controle]
     livro.add_item(epub.EpubNcx())
     livro.add_item(epub.EpubNav())
-    livro.spine = [capa, "nav"] + [c for _, cs in grupos for c in cs] + [controle]
+    livro.spine = [capa]
+    if sumario is not None:
+        livro.spine.append(sumario)
+    livro.spine += [("nav", "no")] + [c for _, cs, _ in grupos for c in cs] + [controle]
 
     destino.parent.mkdir(parents=True, exist_ok=True)
-    epub.write_epub(str(destino), livro)
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=destino.parent) as pasta_tmp:
+        temporario = destino.parent / pasta_tmp / destino.name
+        epub.write_epub(str(temporario), livro)
+        temporario.replace(destino)
     return info_capa

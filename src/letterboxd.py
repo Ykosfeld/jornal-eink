@@ -214,7 +214,7 @@ def _titulo_corresponde(titulo, filme):
     return _normalizar_rotulo(base) == _normalizar_rotulo(filme["titulo"])
 
 
-def priorizar_artigo(sessao, cfg, usados, usados_ids, hoje):
+def priorizar_artigo(sessao, cfg, usados, usados_ids, hoje, filtro_qualidade=None):
     """Devolve (artigo, motivo); `(None, motivo)` aciona o sorteio normal."""
     pcfg = cfg.get("personalizacao_cultural") or {}
     lcfg = validar_config(pcfg.get("letterboxd") if pcfg else cfg.get("letterboxd"))
@@ -289,7 +289,7 @@ def priorizar_artigo(sessao, cfg, usados, usados_ids, hoje):
                 if (_normalizar_rotulo(titulo_candidato.replace("_", " ")) in usados_titulos
                         or candidato["pageid"] in usados_ids):
                     continue
-                if not artigo_aceitavel(sessao, wcfg, candidato):
+                if not artigo_aceitavel(sessao, wcfg, candidato, filtro_qualidade):
                     continue
                 candidato["caminho"] = f"Letterboxd · {filme['titulo']} ({relacao})"
                 candidato["nota"] = (
