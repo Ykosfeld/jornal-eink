@@ -10,6 +10,7 @@ Gera toda semana um **.epub** personalizado, no formato de jornal, para ler em e
 - **Almanaque**: efemérides da semana, curiosidades, datas e destaques da Wikipédia em inglês marcados `[EN]`.
 - **Curiosidades**: um artigo da Wikipédia em português para cada tema configurado (matemática, física, astronomia, música, aves, cinema etc.), normalmente sorteado; opcionalmente, Cinema pode priorizar artigos relacionados a filmes recentes do Letterboxd. Com imagem de destaque em tons de cinza e fórmulas convertidas para MathML.
 - **Deutsch üben**: artigos do *Top-Thema mit Vokabeln* da DW (nível B1), com manuscrito e glossário.
+- **Escolha do Editor**: seleção manual de artigos ou páginas da web, com suporte a uma **extensão de navegador** própria para salvar links com um clique e detectar automaticamente o idioma.
 - **Capa generativa**: mapa topográfico em tons de cinza, gerado a partir dos artigos e da data da edição (mesma edição, mesma capa).
 - **Sem repetição**: um histórico em JSON evita que o mesmo artigo ou notícia apareça em duas edições.
 
@@ -85,10 +86,32 @@ subpasta no catálogo OPDS. `--sem-historico` não move arquivos.
 
 ## Automação e entrega
 
-Para rodar toda semana (exemplo: domingos, 7h), use o `cron`:
+O projeto é executado automaticamente no host atual através de um timer do `systemd`, garantindo a geração periódica e logs melhores em comparação ao antigo setup em cron (anteriormente em um Raspberry Pi).
 
-```cron
-0 7 * * 0 cd /caminho/para/jornal-eink && .venv/bin/python main.py
+Exemplo de arquivo de serviço (`~/.config/systemd/user/jornal-eink.service`):
+
+```ini
+[Unit]
+Description=Gerador do Jornal e-Ink
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/Projetos/jornal-eink
+ExecStart=%h/Projetos/jornal-eink/.venv/bin/python main.py
+```
+
+E o timer (`~/.config/systemd/user/jornal-eink.timer`) para rodar aos domingos às 7h:
+
+```ini
+[Unit]
+Description=Rodar Jornal e-Ink todo domingo
+
+[Timer]
+OnCalendar=Sun *-*-* 07:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
 ```
 
 Para receber o epub no e-reader por Wi-Fi, aponte `saida` para uma pasta servida por um catálogo OPDS, como o [dir2opds](https://github.com/dubyte/dir2opds), e adicione a URL do catálogo no leitor.
