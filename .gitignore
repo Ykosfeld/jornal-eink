@@ -2,4 +2,6 @@ saida/
 .venv/
 __pycache__/
 testes/
+relatorios/
+escolha_do_editor.txt
 plano-jornal-eink.md
