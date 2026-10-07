@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- Background -->
+  <rect width="128" height="128" fill="#ffffff" rx="20" ry="20" />
+  <rect width="128" height="128" fill="none" stroke="#000000" stroke-width="8" rx="20" ry="20" />
+  
+  <!-- The ampersand logo -->
+  <text x="64" y="95" font-family="Georgia, serif" font-size="95" font-weight="bold" fill="#000000" text-anchor="middle">&amp;</text>
+</svg>

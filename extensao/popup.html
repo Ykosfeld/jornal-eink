@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Salvar Link</title>
+  <style>
+    :root {
+      --bg-color: #f8f8f8;
+      --text-color: #111111;
+      --border-color: #666666;
+      --input-bg: #ffffff;
+      --btn-bg: #e0e0e0;
+      --btn-hover: #cccccc;
+      --btn-active: #aaaaaa;
+      --accent: #000000;
+    }
+
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+      padding: 16px; 
+      width: 320px; 
+      margin: 0;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      border: 1px solid var(--border-color);
+      box-sizing: border-box;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 2px solid var(--border-color);
+    }
+
+    .logo {
+      font-family: "Georgia", serif;
+      font-size: 32px;
+      font-weight: bold;
+      margin-right: 12px;
+      color: var(--text-color);
+      line-height: 1;
+      border: 2px solid var(--text-color);
+      padding: 0px 8px;
+      border-radius: 6px;
+      background-color: var(--input-bg);
+      box-shadow: 2px 2px 0px var(--border-color);
+    }
+
+    h1 {
+      font-size: 16px;
+      margin: 0;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-color);
+    }
+
+    label { 
+      font-size: 11px; 
+      font-weight: bold; 
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #333333;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    input, textarea, button { 
+      width: 100%; 
+      box-sizing: border-box; 
+      font-family: inherit;
+      font-size: 14px;
+    }
+
+    input, textarea {
+      background-color: var(--input-bg);
+      border: 1px solid var(--border-color);
+      padding: 8px;
+      color: var(--text-color);
+      border-radius: 4px;
+    }
+
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px var(--accent);
+    }
+
+    textarea { 
+      height: 70px; 
+      resize: vertical; 
+    }
+
+    .row { 
+      margin-bottom: 16px; 
+    }
+
+    button {
+      background-color: var(--text-color);
+      color: var(--bg-color);
+      border: none;
+      padding: 12px;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: background-color 0.2s;
+    }
+
+    button:hover {
+      background-color: #333333;
+    }
+    
+    button:active {
+      background-color: #555555;
+    }
+
+    button:disabled {
+      background-color: var(--border-color);
+      cursor: not-allowed;
+    }
+
+    #status { 
+      margin-top: 12px; 
+      font-size: 13px;
+      font-weight: bold; 
+      text-align: center;
+      min-height: 16px;
+    }
+    
+    .status-success { color: #333333; }
+    .status-error { color: #000000; background-color: #e0e0e0; padding: 4px; border-radius: 4px; border: 1px solid #000; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">&amp;</div>
+    <h1>Jornal e-Ink</h1>
+  </header>
+
+  <div class="row">
+    <label for="url">URL do Artigo</label>
+    <input type="text" id="url" readonly />
+  </div>
+  
+  <div class="row">
+    <label for="lang">Idioma Detectado</label>
+    <input type="text" id="lang" />
+  </div>
+  
+  <div class="row">
+    <label for="comment">Nota do Editor (Opcional)</label>
+    <textarea id="comment" placeholder="Escreva seu comentário aqui..."></textarea>
+  </div>
+  
+  <button id="saveBtn">Salvar na Fila</button>
+  <div id="status"></div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>
