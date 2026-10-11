@@ -19,22 +19,26 @@ PADRAO = {
     "janela_dias": 7,
     "max_filmes": 7,
     "max_creditos_por_filme": 5,
+    "wikipedia_api": "https://en.wikipedia.org/w/api.php",
 }
 
 _CREDITOS = {
-    "direcao", "diretor", "diretora", "realizacao", "realizado por",
-    "roteiro", "roteirista", "argumento", "screenplay", "written by",
+    "direcao", "diretor", "diretora", "realizacao", "realizado por", "directed by",
+    "roteiro", "roteirista", "argumento", "screenplay", "screenplay by", "written by", "story by",
     "elenco", "estrelando", "protagonistas", "cast", "starring",
-    "musica", "trilha sonora", "compositor", "compositora", "music",
-    "music by",
+    "musica", "trilha sonora", "compositor", "compositora", "music", "music by",
 }
 _ROTULOS_FILME = _CREDITOS | {
     "lancamento", "data de lancamento", "data de estreia", "estreia",
-    "release date", "ano", "year", "genero",
+    "release date", "release dates", "ano", "year", "years",
+    "genero", "genre", "running time", "cinematography", "distributed by", "budget", "box office",
+    "production company", "production companies", "companhias produtoras",
 }
-_ROTULOS_ANO = {"lancamento", "data de lancamento", "data de estreia",
-                "estreia", "release date", "ano", "year"}
-_ROTULOS_TITULO = {"titulo", "titulo original", "nome original", "original title"}
+_ROTULOS_ANO = {
+    "lancamento", "data de lancamento", "data de estreia",
+    "estreia", "release date", "release dates", "ano", "year", "years",
+}
+_ROTULOS_TITULO = {"titulo", "titulo original", "nome original", "original title", "title"}
 
 
 def validar_config(cfg):
@@ -51,6 +55,13 @@ def validar_config(cfg):
         valor = resultado[chave]
         if isinstance(valor, bool) or not isinstance(valor, int) or valor <= 0:
             raise ValueError(f"letterboxd.{chave} deve ser um inteiro positivo")
+    wiki_api = resultado.get("wikipedia_api")
+    if wiki_api:
+        if not isinstance(wiki_api, str):
+            raise ValueError("personalizacao_cultural.letterboxd.wikipedia_api deve ser texto")
+        partes_api = urlsplit(wiki_api)
+        if partes_api.scheme not in {"http", "https"} or not partes_api.netloc:
+            raise ValueError("wikipedia_api do Letterboxd deve ser uma URL HTTP(S) válida")
     return resultado
 
 
@@ -152,6 +163,8 @@ def creditos_do_filme(html, ano):
         if rotulo is None:
             rotulo = linha.find("th")
         valor = linha.find("td")
+        if rotulo is not None and valor is None:
+            anos_lancamento.update(re.findall(r"(?<!\d)(?:18|19|20|21)\d{2}(?!\d)", rotulo.get_text(" ", strip=True)))
         if rotulo is None or valor is None:
             continue
         chave = _normalizar_rotulo(rotulo.get_text(" ", strip=True).rstrip(":"))
@@ -168,6 +181,9 @@ def creditos_do_filme(html, ano):
             vistos.add(titulo)
             creditos.append(titulo)
 
+    if not anos_lancamento:
+        anos_lancamento.update(re.findall(r"(?<!\d)(?:18|19|20|21)\d{2}(?!\d)", infobox.get_text(" ", strip=True)))
+
     if not reconhecida or (ano and ano not in anos_lancamento):
         return None
     return creditos
@@ -179,7 +195,7 @@ def _titulo_original_corresponde(html, filme):
     if not infobox:
         return False
     esperado = _normalizar_rotulo(filme["titulo"])
-    for cabecalho in infobox.select("th.infobox-above, caption"):
+    for cabecalho in infobox.select("th.infobox-above, caption, td.infobox-subheader, th.infobox-header"):
         if _normalizar_rotulo(cabecalho.get_text(" ", strip=True)) == esperado:
             return True
     for linha in infobox.select("tr"):
@@ -197,8 +213,19 @@ def _titulo_original_corresponde(html, filme):
 
 
 def _titulos_candidatos(sessao, wcfg, filme):
+    candidatos_diretos = []
+    if filme.get("ano"):
+        candidatos_diretos.extend([
+            f"{filme['titulo']} ({filme['ano']} film)",
+            f"{filme['titulo']} ({filme['ano']})",
+            f"{filme['titulo']} (film)",
+        ])
+    else:
+        candidatos_diretos.append(f"{filme['titulo']} (film)")
+    candidatos_diretos.append(filme["titulo"])
+
     consulta = f'"{filme["titulo"]}"'
-    if filme["ano"]:
+    if filme.get("ano"):
         consulta += f' {filme["ano"]}'
     resposta = api(
         sessao, wcfg, action="query", list="search", srsearch=consulta,
@@ -206,7 +233,16 @@ def _titulos_candidatos(sessao, wcfg, filme):
     )
     if "error" in resposta or not isinstance(resposta.get("query"), dict):
         raise ValueError("resposta inválida da busca da Wikipédia")
-    return [r["title"] for r in resposta["query"].get("search", [])]
+    titulos_busca = [r["title"] for r in resposta["query"].get("search", [])]
+
+    vistos = set()
+    resultado = []
+    for t in candidatos_diretos + titulos_busca:
+        norm = _normalizar_rotulo(t)
+        if norm not in vistos:
+            vistos.add(norm)
+            resultado.append(t)
+    return resultado
 
 
 def _titulo_corresponde(titulo, filme):
@@ -233,7 +269,14 @@ def priorizar_artigo(sessao, cfg, usados, usados_ids, hoje, filtro_qualidade=Non
     if not filmes:
         return None, "nenhum filme assistido na janela configurada"
 
-    wcfg = {**cfg["wikipedia"], "imagens": cfg.get("imagens", {"ativar": False})}
+    api_url = lcfg.get("wikipedia_api") or "https://en.wikipedia.org/w/api.php"
+    lang = "en" if "en.wikipedia.org" in api_url else cfg.get("wikipedia", {}).get("lang", "pt")
+    wcfg = {
+        **cfg["wikipedia"],
+        "api": api_url,
+        "lang": lang,
+        "imagens": cfg.get("imagens", {"ativar": False}),
+    }
     usados_titulos = {_normalizar_rotulo(t.replace("_", " ")) for t in usados}
     creditos_vistos = set()
     for filme in filmes:
@@ -291,6 +334,7 @@ def priorizar_artigo(sessao, cfg, usados, usados_ids, hoje, filtro_qualidade=Non
                     continue
                 if not artigo_aceitavel(sessao, wcfg, candidato, filtro_qualidade):
                     continue
+                candidato["lang"] = candidato.get("lang") or lang
                 candidato["caminho"] = f"Letterboxd · {filme['titulo']} ({relacao})"
                 candidato["nota"] = (
                     "Um passarinho azul, verde e laranja me contou que você ia gostar."

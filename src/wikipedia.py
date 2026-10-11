@@ -156,8 +156,9 @@ def buscar_artigo(sessao, cfg, titulo):
         return None
     corpo, total = limpar_html(pag["extract"], cfg["max_caracteres"], cfg.get("mathml", True))
     revisoes = pag.get("revisions", [])
+    lang = cfg.get("lang") or ("en" if "en.wikipedia.org" in cfg.get("api", "") else "pt")
     return {"pageid": pag["pageid"], "titulo": pag["title"], "url": pag["fullurl"],
-            "html": corpo, "chars": total,
+            "html": corpo, "chars": total, "lang": lang,
             "revid": revisoes[0].get("revid") if revisoes else None,
             "imagem": baixar_imagem(sessao, pag, icfg)}
 

@@ -6,6 +6,7 @@ import requests
 
 from src.itens import item_curiosidade
 from src.letterboxd import (
+    _titulos_candidatos,
     _titulo_original_corresponde,
     creditos_do_filme,
     interpretar_rss,
@@ -297,6 +298,91 @@ class LetterboxdTests(unittest.TestCase):
         artigo_base["nota"] = "Um passarinho azul, verde e laranja me contou que você ia gostar."
         item_com_nota = item_curiosidade("Cinema", artigo_base)
         self.assertEqual(item_com_nota["nota"], artigo_base["nota"])
+
+    @patch("src.letterboxd.api")
+    def test_titulos_candidatos_inclui_sufixos_ingleses_e_busca(self, api_mock):
+        api_mock.return_value = {"query": {"search": [{"title": "Film Search Hit"}]}}
+        candidatos = _titulos_candidatos(
+            object(), {"api": "https://en.wikipedia.org/w/api.php"},
+            {"titulo": "The Fall", "ano": "2006"},
+        )
+        self.assertEqual(
+            candidatos,
+            ["The Fall (2006 film)", "The Fall (2006)", "The Fall (film)", "The Fall", "Film Search Hit"],
+        )
+
+    def test_creditos_infobox_ingles_com_directed_by_e_release_dates(self):
+        html = """
+        <table class="infobox">
+          <tr><th class="infobox-label">Directed by</th>
+              <td><a href="/wiki/Tarsem_Singh" title="Tarsem Singh">Tarsem Singh</a></td></tr>
+          <tr><th class="infobox-label">Starring</th>
+              <td><a href="/wiki/Lee_Pace" title="Lee Pace">Lee Pace</a></td></tr>
+          <tr><th class="infobox-label">Release dates</th>
+              <td>9 September 2006</td></tr>
+        </table>
+        """
+        self.assertEqual(creditos_do_filme(html, "2006"), ["Tarsem Singh", "Lee Pace"])
+        self.assertIsNone(creditos_do_filme(html, "2020"))
+
+    def test_creditos_ano_em_cabecalho_sem_td(self):
+        html = """
+        <table class="infobox">
+          <tr><th class="infobox-header" colspan="2">Estados Unidos 1969 • cor • 113 min</th></tr>
+          <tr><th class="infobox-label">Direção</th>
+              <td><a href="/wiki/John_Schlesinger" title="John Schlesinger">John Schlesinger</a></td></tr>
+        </table>
+        """
+        self.assertEqual(creditos_do_filme(html, "1969"), ["John Schlesinger"])
+
+    @patch("src.letterboxd.artigo_aceitavel", return_value=True)
+    @patch("src.letterboxd.api")
+    @patch("src.letterboxd.buscar_artigo")
+    def test_priorizar_artigo_em_ingles_preserva_lang_en(
+        self, buscar, api_mock, _ores,
+    ):
+        rss = RSS.format(items=entrada("The Fall", "2026-10-02", 5, year="2006", tmdb_id="14784"))
+        sessao = Sessao(rss.encode())
+        filme = {**artigo("The Fall (2006 film)", 10), "lang": "en"}
+        buscar.return_value = filme
+        api_mock.side_effect = [
+            {"query": {"search": []}},
+            {"parse": {"text": """
+                <table class="infobox">
+                  <tr><th class="infobox-label">Directed by</th>
+                      <td><a href="/wiki/Tarsem_Singh">Tarsem Singh</a></td></tr>
+                  <tr><th class="infobox-label">Release dates</th><td>2006</td></tr>
+                </table>
+            """}},
+        ]
+        cfg = {
+            "personalizacao_cultural": {
+                "ativar": True,
+                "letterboxd": {
+                    "ativar": True,
+                    "feed_url": "https://letterboxd.com/example/rss/",
+                },
+            },
+            "wikipedia": {"min_caracteres": 300},
+        }
+
+        selecionado, motivo = priorizar_artigo(
+            sessao, cfg, set(), set(), dt.date(2026, 10, 2),
+        )
+
+        self.assertEqual(motivo, "")
+        self.assertEqual(selecionado["titulo"], "The Fall (2006 film)")
+        self.assertEqual(selecionado["lang"], "en")
+
+    def test_item_curiosidade_preserva_lang_e_prefixo_commons(self):
+        artigo_en = {
+            **artigo("The Fall", 10),
+            "lang": "en",
+            "imagem": {"arquivo": "Poster.jpg", "bytes": b"fake"},
+        }
+        item = item_curiosidade("Cinema", artigo_en)
+        self.assertEqual(item["lang"], "en")
+        self.assertIn("https://commons.wikimedia.org/wiki/File:Poster.jpg", item["credito"])
 
 
 if __name__ == "__main__":

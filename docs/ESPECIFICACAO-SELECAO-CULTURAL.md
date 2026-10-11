@@ -51,11 +51,17 @@ mecanismo atual.
 
 - Favorecer relações diretas e verificáveis, não semelhanças temáticas
   inferidas apenas por palavras em comum.
+- Como o feed do Letterboxd fornece os títulos em inglês, a busca consulta
+  por padrão a Wikipédia em inglês (`https://en.wikipedia.org/w/api.php`,
+  configurável via `letterboxd.wikipedia_api`), gerando o capítulo em inglês
+  (`lang="en"`), com candidatos diretos derivados do título e ano
+  (ex.: `Film (2006 film)`, `Film (film)` e `Film`).
 - Para cada filme, buscar candidatos na Wikipédia; validar o artigo do filme
   por sua infocaixa e examinar somente linhas de crédito explicitamente
-  identificadas nela. Considerar primeiro o artigo do próprio filme e, em
-  seguida, artigos sobre pessoas com crédito direto nele, como direção,
-  roteiro, atuação ou composição da trilha.
+  identificadas nela (como direção, roteiro, atuação ou composição da trilha),
+  com suporte a infocaixas em inglês (`Template:Infobox film`) e em português
+  (`Info/Cinema`). Considerar primeiro o artigo do próprio filme e, em
+  seguida, artigos sobre pessoas com crédito direto nele.
 - Confirmar relações com dados da Wikipédia ou créditos/metadados confiáveis.
   Não associar um artigo quando a correspondência for ambígua.
 - Processar filmes na ordem definida pela nota e data. Se houver mais de um
@@ -64,7 +70,7 @@ mecanismo atual.
 - Respeitar o histórico de artigos já publicados. As categorias configuradas
   continuam dirigindo o sorteio aleatório de Cinema usado como fallback; os
   candidatos personalizados são classificados pela correspondência verificada
-  ao filme/crédito e pelo filtro ORES.
+  ao filme/crédito e pelo filtro ORES/Lift Wing.
 - Marcar no capítulo selecionado por Letterboxd, no campo de nota já usado pelo
   jornal, a mensagem humorística: “Um passarinho azul, verde e laranja me
   contou que você ia gostar.”
@@ -73,14 +79,15 @@ mecanismo atual.
 
 ## Qualidade dos artigos
 
-- Avaliar cada candidato relacionado pelo filtro ORES existente para a
-  Wikipédia em português, usando `wikipedia.filtro_qualidade` (atualmente
-  classe mínima **B**).
+- Avaliar cada candidato relacionado pelo filtro de qualidade (Lift Wing),
+  usando o modelo adequado para o idioma do artigo (`enwiki-articlequality`
+  para artigos da Wikipédia em inglês, e `ptwiki-articlequality` para português),
+  respeitando `wikipedia.filtro_qualidade` (classe mínima configurada).
 - Rejeitar candidatos abaixo do limite e tentar o próximo candidato conforme
   a ordem de prioridade.
 - Se não restar candidato relacionado elegível, usar o sorteio atual, que
-  também deve respeitar o filtro ORES configurado.
-- Preservar o comportamento existente em caso de indisponibilidade do ORES:
+  também deve respeitar o filtro ORES/Lift Wing configurado.
+- Preservar o comportamento existente em caso de indisponibilidade do modelo:
   registrar aviso e não rejeitar um candidato apenas por essa falha.
 
 ## Configuração proposta

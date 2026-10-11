@@ -27,12 +27,17 @@ def item_curiosidade(tema, art):
     u = html.escape(art["url"])
     img_credito = ""
     if art.get("imagem") and art["imagem"].get("arquivo"):
-        link = "https://pt.wikipedia.org/wiki/Ficheiro:" + art["imagem"]["arquivo"].replace(" ", "_")
+        wiki_prefix = (
+            "https://commons.wikimedia.org/wiki/File:"
+            if (art.get("lang") == "en" or "en.wikipedia.org" in art.get("url", ""))
+            else "https://pt.wikipedia.org/wiki/Ficheiro:"
+        )
+        link = wiki_prefix + art["imagem"]["arquivo"].replace(" ", "_")
         img_credito = f' Imagem: <a href="{html.escape(link)}">página do arquivo</a> (Wikimedia).'
     return {"fonte_id": tema, "fonte": "Wikipédia", "rotulo": tema,
             "titulo": art["titulo"], "titulo_toc": f'{tema}: {art["titulo"]}',
             "url": art["url"], "html": art["html"], "chars": art["chars"],
-            "lang": "pt", "data": "", "imagem": art.get("imagem"),
+            "lang": art.get("lang", "pt"), "data": "", "imagem": art.get("imagem"),
             "credito": f'Fonte: Wikipédia — <a href="{u}">{u}</a> (CC BY-SA 4.0).{img_credito}',
             "nota": art.get("nota", ""), "pageid": art["pageid"]}
 

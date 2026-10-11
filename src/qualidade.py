@@ -54,10 +54,19 @@ def validar_config(cfg):
 
 
 def _extrair_previsao(dados, revid):
-    try:
-        return dados["ptwiki"]["scores"][str(revid)]["articlequality"]["score"]["prediction"]
-    except (KeyError, TypeError):
-        pass
+    if isinstance(dados, dict):
+        for wiki_key in ("ptwiki", "enwiki"):
+            if wiki_key in dados and isinstance(dados[wiki_key], dict):
+                try:
+                    return dados[wiki_key]["scores"][str(revid)]["articlequality"]["score"]["prediction"]
+                except (KeyError, TypeError):
+                    pass
+        for val in dados.values():
+            if isinstance(val, dict) and "scores" in val:
+                try:
+                    return val["scores"][str(revid)]["articlequality"]["score"]["prediction"]
+                except (KeyError, TypeError):
+                    pass
     try:
         return dados["prediction"]
     except (KeyError, TypeError):
@@ -140,7 +149,10 @@ class FiltroQualidade:
             self._registrar_sem_filtro(art["titulo"])
             return True
         self.avaliados += 1
-        classe, erro = avaliar_qualidade(sessao, art.get("revid"), self.config)
+        cfg_avaliacao = self.config
+        if art.get("lang") == "en" or ("url" in art and "en.wikipedia.org" in (art.get("url") or "")):
+            cfg_avaliacao = {**self.config, "modelo": "enwiki-articlequality"}
+        classe, erro = avaliar_qualidade(sessao, art.get("revid"), cfg_avaliacao)
         if erro:
             self.falhas += 1
             self.falhas_consecutivas += 1
