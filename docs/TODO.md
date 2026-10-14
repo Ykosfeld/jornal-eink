@@ -5,7 +5,7 @@
 - [] Capas terem um tema por mês, talvez mudar o algoritmo
 - [] No mês os artigos da wikipedia seguirem um caminho
 - [x] ~~Priorizar artigos de Cinema relacionados a filmes recentes do Letterboxd~~ (ver [especificação](./ESPECIFICACAO-SELECAO-CULTURAL.md))
-- [] Personalizar Música e Música clássica com artistas e álbuns mais ouvidos no Last.fm (implementar quando houver chave da API disponível)
+- [x] ~~Personalizar Música e Música clássica com artistas e álbuns mais ouvidos no Last.fm~~ (ver [especificação](./ESPECIFICACAO-SELECAO-CULTURAL.md))
 - [x] ~~Formatar e dar mais cara de jornal~~
 - [x] ~~Colocar a opção de pegar um artigo da wikipedia selecionado manualmente e chama-lo de escolha do editor~~
 - [x] ~~Obituário, feriados e curiosidades da página inicial da Wikipédia (Almanaque)~~

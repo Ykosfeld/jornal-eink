@@ -14,6 +14,7 @@ from .feeds import coletar_noticias
 from .historico import caminho_historico, carregar_historico, salvar_historico
 from .itens import item_almanaque, item_curiosidade, item_editor, item_externo
 from .layout import ErroLayout, fontes_usadas, montar_secoes, resolver_layout
+from .lastfm import priorizar_artigos_musica, validar_config as validar_lastfm_config
 from .letterboxd import priorizar_artigo, validar_config as validar_letterboxd_config
 from .qualidade import FiltroQualidade
 from .relatorio import dados_relatorio, gravar_relatorio, resumo_texto
@@ -44,7 +45,8 @@ def coletar_curiosidades(sessao, cfg, usados, usados_ids, rng, hoje, temas=None,
     for tema, cats in temas.items():
         art = priorizados.get(tema)
         if art:
-            print(f"[{tema}] priorizado pelo Letterboxd...", end=" ", flush=True)
+            origem = art.get("caminho", "").split(" · ")[0] if art.get("caminho") else "Personalização"
+            print(f"[{tema}] priorizado por {origem}...", end=" ", flush=True)
         else:
             print(f"[{tema}] sorteando...", end=" ", flush=True)
         try:
@@ -158,8 +160,28 @@ def gerar_edicao(sessao, cfg, semente=None, usar_hist=True, escolhas=()):
             sys.exit(str(e))
         if art:
             priorizados["Cinema"] = art
+            usados.add(art["titulo"])
+            usados_ids.add(art["pageid"])
         elif motivo:
             print(f"Aviso Letterboxd: {motivo}; usando o sorteio normal de Cinema.")
+
+    fmcfg = pcfg.get("lastfm") or {}
+    temas_musica_config = fmcfg.get("temas") or ["Música", "Música clássica"]
+    temas_musica = [t for t in temas_musica_config if t in temas_usados]
+    if pcfg.get("ativar") and fmcfg.get("ativar") and temas_musica:
+        try:
+            validar_lastfm_config(fmcfg)
+            arts_priorizados, motivo_fm = priorizar_artigos_musica(
+                sessao, cfg, usados, usados_ids, hoje, filtro_qualidade, temas_alvo=temas_musica,
+            )
+        except ValueError as e:
+            sys.exit(str(e))
+        for tema_m, art_m in arts_priorizados.items():
+            priorizados[tema_m] = art_m
+            usados.add(art_m["titulo"])
+            usados_ids.add(art_m["pageid"])
+        if not arts_priorizados and motivo_fm:
+            print(f"Aviso Last.fm: {motivo_fm}; usando o sorteio normal para temas de música.")
     artigos, novos, pulados = coletar_curiosidades(
         sessao, cfg, usados, usados_ids, rng, hoje, temas_usados, priorizados,
         filtro_qualidade,

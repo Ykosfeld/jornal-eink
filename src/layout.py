@@ -3,7 +3,7 @@ import difflib
 from itertools import zip_longest
 
 # Fontes que não são temas da Wikipédia. Não podem ser usadas como nome de tema.
-RESERVADAS = ("noticias", "dw", "editor", "letterboxd", "almanaque")
+RESERVADAS = ("noticias", "dw", "editor", "letterboxd", "almanaque", "lastfm")
 ORDENS = ("sequencial", "intercalar")
 
 

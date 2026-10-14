@@ -1,16 +1,14 @@
-# Especificação: priorização de artigos de Cinema pelo Letterboxd
+# Especificação: priorização cultural (Letterboxd para Cinema, Last.fm para Música)
 
 ## Objetivo e escopo
 
-Priorizar artigos da Wikipédia para o tema **Cinema** com base nos filmes que
-o usuário assistiu nos últimos dias e registrou no Letterboxd. Esta etapa
-implementa somente a integração com Letterboxd. A seleção dos temas **Música**
-e **Música clássica** permanece inalterada; a integração Last.fm fica para uma
-etapa futura, registrada em [TODO.md](./TODO.md).
+Priorizar artigos da Wikipédia para temas culturais com base na atividade recente do usuário:
+- **Cinema**: com base nos filmes assistidos e avaliados no Letterboxd.
+- **Música** e **Música clássica**: com base nas músicas, álbuns e artistas mais ouvidos no Last.fm.
 
-A personalização complementa o sorteio existente: se não houver filmes
-recentes ou candidatos relacionados elegíveis, Cinema continua usando o
-mecanismo atual.
+A personalização complementa o sorteio existente: se não houver registros
+recentes ou candidatos relacionados elegíveis, os temas continuam usando o
+mecanismo de sorteio atual.
 
 ## Fonte de dados e configuração
 
@@ -92,8 +90,7 @@ mecanismo atual.
 
 ## Configuração proposta
 
-Adicionar uma seção opcional `personalizacao_cultural` ao `config.yaml`, com
-valores equivalentes a:
+Adicionar à seção `personalizacao_cultural` do `config.yaml` as configurações de Letterboxd e Last.fm:
 
 ```yaml
 personalizacao_cultural:
@@ -104,14 +101,20 @@ personalizacao_cultural:
     janela_dias: 7
     max_filmes: 7
     max_creditos_por_filme: 5
+  lastfm:
+    ativar: false
+    usuario: ""
+    api_key: ""                   # ou via variável de ambiente LASTFM_API_KEY
+    janela_dias: 7
+    max_itens: 10
+    temas:
+      - Música
+      - Música clássica
 ```
 
-- A ausência ou desativação da seção mantém a seleção atual.
-- `janela_dias` deve ser um inteiro positivo.
-- `max_filmes` limita quantos filmes ordenados são processados (7 por padrão);
-  `max_creditos_por_filme` limita quantos links de crédito são consultados por
-  filme (5 por padrão).
-- Não adicionar configuração Last.fm nesta etapa.
+- A ausência ou desativação de cada serviço mantém a seleção padrão de sorteio.
+- `janela_dias` e limites de itens devem ser inteiros positivos.
+- Para o Last.fm, a consulta utiliza a API oficial (`user.getrecenttracks`), selecionando os mais ouvidos com desempate por recência, e avalia candidatos bilíngues (pt/en) equilibrando qualidade (Lift Wing) e tamanho em caracteres.
 
 ## Privacidade e persistência
 

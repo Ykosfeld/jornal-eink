@@ -126,8 +126,8 @@ temas:
     - Atores de cinema dos Estados Unidos
     - Atores de cinema do Reino Unido
 
-# Prioriza artigos de Cinema por filmes assistidos no Letterboxd.
-# A integração é opcional e não altera o sorteio quando desativada.
+# Prioriza artigos culturais por atividade recente (Letterboxd para Cinema, Last.fm para Música).
+# As integrações são opcionais e não alteram o sorteio quando desativadas.
 personalizacao_cultural:
   ativar: true
   letterboxd:
@@ -136,6 +136,15 @@ personalizacao_cultural:
     janela_dias: 7
     max_filmes: 7                 # máximo de filmes recentes considerados, já ordenados
     max_creditos_por_filme: 5     # máximo de créditos da infocaixa consultados por filme
+  lastfm:
+    ativar: true
+    usuario: "Ykosfeld"
+    api_key: ""                   # lida automaticamente da variável LASTFM_API_KEY no .venv
+    janela_dias: 7
+    max_itens: 10                 # máximo de artistas/itens recentes considerados
+    temas:
+      - Música
+      - Música clássica
 
 # Notícias: feeds RSS/Atom e/ou arquivos OPML (caminho local ou URL). Pode usar os dois ao mesmo tempo.
 # Caminhos relativos são lidos a partir da pasta do script.
