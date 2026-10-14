@@ -1,4 +1,7 @@
-# jornal-eink
+<div align="center">
+  <img src="extensao/icon.svg" alt="jornal-eink logo" width="100" height="100">
+  <h1>jornal-eink</h1>
+</div>
 
 Gera toda semana um **.epub** personalizado, no formato de jornal, para ler em e-reader (feito para o Xteink X4 com firmware CrossPoint, tela de 480 px, mas funciona em qualquer leitor de epub).
 
