@@ -147,12 +147,9 @@ noticias:
   max_caracteres: 8000
   min_caracteres: 500   # texto extraído menor que isso -> tenta o resumo do feed
   feeds:
-    # - {nome: "Polygon", url: "https://www.polygon.com/rss/index.xml"}
-    # - {nome: "Deadline", url: "https://deadline.com/feed/"}
-    # - {nome: "IndieWire", url: "https://www.indiewire.com/feed"}
+    - {nome: "what if xkcd", url: "https://what-if.xkcd.com/feed.atom"}
+    - {nome: "Quanta Magazine", url: "https://www.quantamagazine.org/feed/"}
     - {nome: "Variety", url: "https://variety.com/feed/"}
-    # - {nome: "Jason Schreier", url: "https://www.bloomberg.com/authors/AUvqMRVAZCw/jason-schreier.rss"}
-    # - {nome: "Exemplo", url: "https://exemplo.com/feed.xml"}
     # - "https://outro.com/rss"          # sem nome: usa o título do feed
   opml: []
     # - feeds.opml
