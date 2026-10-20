@@ -56,6 +56,21 @@ class FeatureTests(unittest.TestCase):
                 sumario = epub.read(next(nome for nome in nomes if nome.endswith("sumario.xhtml")))
                 self.assertIn(b"item_001.xhtml", sumario)
 
+    def test_css_epub_tipografia_eink_sem_margem_entre_paragrafos(self):
+        from src.epub_builder import CSS
+        self.assertIn("p { text-align: justify; margin: 0; text-indent: 1.25em; }", CSS)
+        self.assertIn("h1 + p", CSS)
+        self.assertIn("break-inside: avoid", CSS)
+
+    def test_limpar_generico_higieniza_br_e_paragrafos(self):
+        from src.feeds import limpar_generico
+        html_feed = "<p>Primeiro parágrafo.<br><br>Segundo parágrafo.</p><p><br>Terceiro parágrafo.<br></p>"
+        limpo, _ = limpar_generico(html_feed, 1000)
+        self.assertNotIn("<br><br>", limpo)
+        self.assertIn("<p>Primeiro parágrafo.</p>", limpo)
+        self.assertIn("<p>Segundo parágrafo.</p>", limpo)
+        self.assertIn("<p>Terceiro parágrafo.</p>", limpo)
+
 
 if __name__ == "__main__":
     unittest.main()

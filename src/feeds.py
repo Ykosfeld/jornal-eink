@@ -90,7 +90,11 @@ def texto_da_entrada(e):
 
 def limpar_generico(fragmento, max_chars):
     """HTML qualquer (saída do readability ou resumo de feed) -> blocos simples para e-ink."""
-    soup = BeautifulSoup(fragmento or "", "lxml")
+    if not fragmento:
+        return "", 0
+    # Converte múltiplos <br> consecutivos de feeds em parágrafos semânticos reais
+    fragmento = re.sub(r'(?:<br\s*/?>[\s\r\n]*){2,}', '</p><p>', fragmento)
+    soup = BeautifulSoup(fragmento, "lxml")
     saida, total = [], 0
     for no in soup.find_all(BLOCOS):
         if no.find_parent(["p", "ul", "ol", "blockquote"]):
@@ -101,7 +105,34 @@ def limpar_generico(fragmento, max_chars):
             else:
                 t.attrs = {}
         no.attrs = {}
-        texto = no.get_text(strip=True)
+
+        # Remove <br> consecutivos residuais dentro do nó
+        for br in list(no.find_all("br")):
+            prox = br.next_sibling
+            while prox and isinstance(prox, str) and not prox.strip():
+                prox = prox.next_sibling
+            if prox and getattr(prox, "name", None) == "br":
+                br.extract()
+
+        # Remove quebras <br> e espaços vazios nas extremidades do bloco
+        while no.contents:
+            primeiro = no.contents[0]
+            if getattr(primeiro, "name", None) == "br":
+                primeiro.extract()
+            elif isinstance(primeiro, str) and not primeiro.strip():
+                primeiro.extract()
+            else:
+                break
+        while no.contents:
+            ultimo = no.contents[-1]
+            if getattr(ultimo, "name", None) == "br":
+                ultimo.extract()
+            elif isinstance(ultimo, str) and not ultimo.strip():
+                ultimo.extract()
+            else:
+                break
+
+        texto = no.get_text(strip=True).replace("\xa0", " ").strip()
         if len(texto) < 2:
             continue
         total += len(texto)

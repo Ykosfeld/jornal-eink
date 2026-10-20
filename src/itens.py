@@ -131,7 +131,7 @@ def item_almanaque(alm):
             trecho = (f" — <span lang=\"en\">{descricao}</span>" if descricao else "")
             data = destaque["data"]
             partes.append(
-                f'<p>{chamada_html} <small>[EN]</small><br/>{titulo_html}{trecho} '
+                f'<p class="destaque">{chamada_html} <small>[EN]</small><br/>{titulo_html}{trecho} '
                 f'<small>{_DIAS[data.weekday()]}, {data.day}</small>'
             )
             if temas:

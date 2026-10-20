@@ -9,27 +9,42 @@ from .leitura import minutos_de_leitura, validar_config as validar_leitura_confi
 from .relatorio import html_estrutura, html_secao_vazia
 
 CSS = """
-body { font-family: serif; line-height: 1.4; margin: 0 0.5em; }
-h1 { font-size: 1.5em; margin: 0.6em 0 0.2em; }
-h2 { font-size: 1.2em; margin-top: 1.2em; }
-h3 { font-size: 1.05em; }
-p { text-align: justify; margin: 0.5em 0; }
-.tema { font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.08em; }
-.nota { font-style: italic; text-align: left; border-left: 2px solid #000; padding-left: 0.6em; margin: 0.8em 0; }
-.fonte { font-size: 0.8em; margin-top: 2em; border-top: 1px solid #000; padding-top: 0.5em; }
+body { font-family: serif; line-height: 1.4; margin: 0 0.5em; text-rendering: optimizeLegibility; }
+h1 { font-size: 1.45em; margin: 0.6em 0 0.25em; line-height: 1.2; }
+h2 { font-size: 1.2em; margin: 1.1em 0 0.3em; line-height: 1.25; }
+h3 { font-size: 1.05em; margin: 0.8em 0 0.2em; }
+h4 { font-size: 1em; margin: 0.6em 0 0.2em; }
+
+/* Tipografia contínua para e-ink / telas pequenas (Xteink X4) */
+p { text-align: justify; margin: 0; text-indent: 1.25em; }
+
+/* Primeiro parágrafo após títulos, quebras ou blocos isolados sem recuo */
+h1 + p, h2 + p, h3 + p, h4 + p,
+p.tema + p, p.nota + p, p.imagem + p,
+blockquote + p, ul + p, ol + p, table + p { text-indent: 0; }
+
+.tema { font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.08em; margin: 0 0 0.2em; text-indent: 0; }
+.nota { font-style: italic; text-align: left; border-left: 2px solid #000; padding-left: 0.6em; margin: 0.8em 0; text-indent: 0; page-break-inside: avoid; break-inside: avoid; }
+.fonte { font-size: 0.8em; margin-top: 1.8em; margin-bottom: 0; border-top: 1px solid #000; padding-top: 0.4em; text-indent: 0; text-align: left; }
 img { max-width: 100%; height: auto; }
-.imagem { text-align: center; margin: 0.6em 0; }
+.imagem { text-align: center; margin: 0.6em 0; text-indent: 0; page-break-inside: avoid; break-inside: avoid; }
 .capa { text-align: center; margin: 0; padding: 0; }
 .capa img { width: 100%; height: auto; max-height: 100%; }
 .divisoria { page-break-before: always; text-align: center; margin: 8em 1em; padding: 2em 0; }
 .divisoria h1 { font-size: 1.8em; }
-.divisoria p { text-align: center; }
-.legenda { font-style: italic; }
+.divisoria p { text-align: center; text-indent: 0; margin: 0.4em 0; }
+.legenda { font-style: italic; text-indent: 0; margin: 0.4em 0; }
+.destaque { text-indent: 0; margin: 0.6em 0; }
+.sumario p, .meta { text-indent: 0; margin: 0.2em 0; }
 .dia { margin-top: 1.2em; }
-table { font-size: 0.85em; border-collapse: collapse; margin: 0.8em 0; }
+ul, ol { margin: 0.5em 0; padding-left: 1.4em; }
+li { margin: 0.2em 0; }
+blockquote { margin: 0.6em 0; padding-left: 0.8em; border-left: 2px solid #000; font-style: italic; }
+blockquote p { text-indent: 0; margin: 0.3em 0; }
+table { font-size: 0.85em; border-collapse: collapse; margin: 0.8em 0; page-break-inside: avoid; break-inside: avoid; }
 td { padding: 0.2em 1em 0.2em 0; vertical-align: top; }
 small { font-size: 0.8em; }
-math { font-size: 1em; }
+math, .mwe-math-element { font-size: 1em; page-break-inside: avoid; break-inside: avoid; }
 """
 
 
@@ -80,7 +95,7 @@ def _sumario(livro, css, cfg, data, numero_edicao, entradas, total):
     horas, minutos = divmod(total, 60)
     leitura = f"{minutos} min" if not horas else f"{horas} h {minutos:02d} min"
     linhas = [
-        f"<h1>Nesta edição</h1>",
+        f'<div class="sumario"><h1>Nesta edição</h1>',
         f"<p>{html.escape(cfg['titulo'])} · {data.strftime('%d/%m/%Y')}"
         + (f" · Nº {numero_edicao}" if numero_edicao is not None else "") + "</p>",
         f"<p>Cerca de {leitura} de leitura</p>",
@@ -93,6 +108,7 @@ def _sumario(livro, css, cfg, data, numero_edicao, entradas, total):
                 f'{html.escape(it["fonte"])} · ~{minutos} min</li>'
             )
         linhas.append("</ul>")
+    linhas.append("</div>")
     c = capitulo("sumario.xhtml", "Nesta edição", "".join(linhas), css)
     livro.add_item(c)
     return c
