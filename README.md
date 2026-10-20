@@ -37,6 +37,8 @@ pip install -r requirements.txt
 
 ```bash
 python main.py                                  # gera a edição da semana
+python main.py --painel                         # gera o painel HTML dos relatórios e histórico
+python main.py --painel --abrir                 # gera e abre o painel no navegador padrão
 python main.py --validar                        # testa as categorias da Wikipédia do config
 python main.py --validar-feeds                  # testa os feeds de notícias e da DW
 python main.py --semente 42 --sem-historico     # teste reprodutível, sem mexer no histórico
@@ -67,6 +69,8 @@ Tudo fica no `config.yaml`:
 | `leitura` | Caracteres por minuto usados nos tempos estimados |
 | `sumario` | Ativa o capítulo "Nesta edição" após a capa |
 | `divisorias` | Ativa páginas divisórias por seção e define o mínimo de itens |
+| `relatorio` | Ativa e define pasta dos relatórios JSON por edição |
+| `painel` | Gera painel HTML estático dos relatórios e do acervo |
 
 Para ativar a personalização de Cinema, defina `personalizacao_cultural.ativar`
 e `personalizacao_cultural.letterboxd.ativar` como `true` e configure
@@ -140,6 +144,7 @@ src/
   historico.py       # controle de itens já publicados
   escolha.py         # escolhas do editor
   letterboxd.py      # personalização cultural de Cinema
+  painel.py          # painel HTML estático (relatórios e histórico)
   relatorio.py       # relatório JSON e resumo
 docs/TODO.md         # ideias e pendências
 ```

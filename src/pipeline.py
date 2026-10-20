@@ -16,6 +16,7 @@ from .itens import item_almanaque, item_curiosidade, item_editor, item_externo
 from .layout import ErroLayout, fontes_usadas, montar_secoes, resolver_layout
 from .lastfm import priorizar_artigos_musica, validar_config as validar_lastfm_config
 from .letterboxd import priorizar_artigo, validar_config as validar_letterboxd_config
+from .painel import gerar_painel
 from .qualidade import FiltroQualidade
 from .relatorio import dados_relatorio, gravar_relatorio, resumo_texto
 from .wikipedia import sortear_artigo
@@ -262,6 +263,10 @@ def gerar_edicao(sessao, cfg, semente=None, usar_hist=True, escolhas=()):
               + ", ".join(filtro_qualidade.sem_filtro))
     if rel:
         print(f"Relatório: {rel}")
+    pcfg = {"ativar": True, **(cfg.get("painel") or {})}
+    if pcfg.get("ativar", True):
+        painel = gerar_painel(cfg)
+        print(f"Painel: {painel}")
     if pulados:
         print("ATENÇÃO — temas sem artigo nesta edição: "
               + ", ".join(f"{t} ({m})" for t, m in pulados.items())

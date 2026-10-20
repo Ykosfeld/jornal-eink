@@ -20,6 +20,7 @@ import time
 from src.config import carregar_config, criar_sessao
 from src.feeds import validar_feeds
 from src.layout import ErroLayout, imprimir_layout, resolver_layout
+from src.painel import gerar_painel
 from src.pipeline import gerar_edicao
 from src.qualidade import FiltroQualidade, avaliar_qualidade
 from src.wikipedia import buscar_artigo, validar_categorias
@@ -39,9 +40,20 @@ def main():
                     help="não lê nem grava o histórico, e não esvazia a fila de escolhas (use em testes)")
     ap.add_argument("--escolha", action="append", default=[], metavar="'URL [| nota] [| @arquivo.html]'",
                     help="Escolha do Editor: link extra além do escolha_do_editor.txt (pode repetir)")
+    ap.add_argument("--painel", action="store_true",
+                    help="gera o painel HTML com o histórico e relatórios existentes")
+    ap.add_argument("--abrir", action="store_true",
+                    help="abre o painel HTML gerado no navegador padrão (junto com --painel)")
     args = ap.parse_args()
 
     cfg = carregar_config(args.config)
+
+    if args.painel:
+        caminho = gerar_painel(cfg, abrir=args.abrir)
+        print(f"Painel gerado com sucesso: {caminho}")
+        if not args.abrir:
+            print("Dica: use --abrir para abrir diretamente no seu navegador padrão.")
+        return
 
     if args.validar_layout:
         try:

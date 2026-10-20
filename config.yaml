@@ -288,3 +288,8 @@ secoes:
 relatorio:
   ativar: true
   pasta: relatorios
+
+# Painel HTML para visualização interativa dos relatórios e do acervo histórico
+painel:
+  ativar: true                   # gera automaticamente ao final de cada edição
+  arquivo: relatorios/painel.html # caminho relativo à raiz do projeto
