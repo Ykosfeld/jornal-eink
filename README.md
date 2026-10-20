@@ -5,7 +5,7 @@
 
 Gera toda semana um **.epub** personalizado, no formato de jornal, para ler em e-reader (feito para o Xteink X4 com firmware CrossPoint, tela de 480 px, mas funciona em qualquer leitor de epub).
 
-> 🤖 **Aviso:** este projeto é desenvolvido com auxílio de ferramentas de IA (Claude, da Anthropic), tanto no planejamento quanto na escrita do código. Todo o código é revisado e testado por mim, mas pode conter erros ou soluções pouco convencionais.
+> 🤖 **Aviso:** este projeto é desenvolvido com auxílio de ferramentas de IA, tanto no planejamento quanto na escrita do código. Todo o código é revisado e testado por mim, mas pode conter erros ou soluções pouco convencionais.
 
 ## O que tem em cada edição
 
