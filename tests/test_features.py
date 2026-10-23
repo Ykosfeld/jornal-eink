@@ -73,6 +73,46 @@ class FeatureTests(unittest.TestCase):
         self.assertIn("<p>Segundo parágrafo.</p>", limpo)
         self.assertIn("<p>Terceiro parágrafo.</p>", limpo)
 
+    def test_escolha_do_editor_respeita_limite_e_mantem_pendencias(self):
+        from unittest.mock import patch, MagicMock
+        from src.escolha import coletar_escolhas, consumir_fila
+
+        conteudo = (
+            "https://pt.wikipedia.org/wiki/Item_1\n"
+            "https://pt.wikipedia.org/wiki/Item_2\n"
+            "https://pt.wikipedia.org/wiki/Item_3\n"
+            "https://pt.wikipedia.org/wiki/Item_4\n"
+        )
+        with tempfile.TemporaryDirectory() as pasta:
+            arq = Path(pasta) / "fila.txt"
+            arq.write_text(conteudo, encoding="utf-8")
+
+            cfg = {
+                "escolha_do_editor": {"arquivo": str(arq), "quantidade": 2},
+                "wikipedia": {"api": "https://pt.wikipedia.org/w/api.php"},
+            }
+
+            def mock_obter(sessao, ecfg, wbase, e):
+                return {
+                    "fonte": "Wikipédia", "titulo": e["url"].split("/")[-1],
+                    "url": e["url"], "html": "<p>teste</p>", "chars": 500,
+                    "lang": "pt", "imagem": None,
+                }
+
+            with patch("src.escolha.obter_escolha", side_effect=mock_obter):
+                itens, fila = coletar_escolhas(MagicMock(), cfg)
+
+            self.assertEqual(len(itens), 2)
+            self.assertEqual(itens[0]["titulo"], "Item_1")
+            self.assertEqual(itens[1]["titulo"], "Item_2")
+
+            consumir_fila(fila)
+            restante = arq.read_text(encoding="utf-8").splitlines()
+            self.assertEqual(restante, [
+                "https://pt.wikipedia.org/wiki/Item_3",
+                "https://pt.wikipedia.org/wiki/Item_4",
+            ])
+
 
 if __name__ == "__main__":
     unittest.main()

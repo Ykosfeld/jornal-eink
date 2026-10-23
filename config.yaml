@@ -183,6 +183,7 @@ dw:
 # Escolha do editor
 escolha_do_editor:
   arquivo: escolha_do_editor.txt
+  quantidade: 2            # máximo de artigos da escolha do editor por edição (0 = sem limite)
   max_caracteres: 30000
   min_caracteres: 300      # abaixo disso: provável paywall
   lang: pt                 # idioma assumido se a página não declarar

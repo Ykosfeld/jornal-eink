@@ -24,6 +24,7 @@ from .wikipedia import buscar_artigo
 
 PADRAO = {
     "arquivo": "escolha_do_editor.txt",
+    "quantidade": 2,         # máximo por edição (0 = sem limite)
     "max_caracteres": 30000,
     "min_caracteres": 300,   # abaixo disso: provável paywall / extração ruim
     "lang": "pt",            # idioma assumido quando a página não declara <html lang>
@@ -161,8 +162,17 @@ def coletar_escolhas(sessao, cfg, extras=(), registros=()):
     Itens que falham não entram e permanecem no arquivo para a próxima edição.
     """
     ecfg = {**PADRAO, **(cfg.get("escolha_do_editor") or {})}
+    limite = ecfg.get("quantidade")
+    if limite is None:
+        limite = ecfg.get("max_itens", 2)
+    try:
+        limite = int(limite)
+    except (ValueError, TypeError):
+        limite = 2
+
     caminho = resolver_caminho(ecfg["arquivo"])
-    linhas, entradas = ler_fila(caminho)
+    linhas, fila_entradas = ler_fila(caminho)
+    extras_entradas = []
     for linha in extras:
         try:
             e = interpretar_linha(linha)
@@ -170,8 +180,9 @@ def coletar_escolhas(sessao, cfg, extras=(), registros=()):
             print(f"  --escolha ignorado ({err}): {linha}")
             continue
         if e:
-            entradas.append(e)
+            extras_entradas.append(e)
 
+    entradas = extras_entradas + fila_entradas
     fila = {"caminho": caminho, "linhas": linhas, "publicados": set()}
     if not entradas:
         return [], fila
@@ -187,6 +198,8 @@ def coletar_escolhas(sessao, cfg, extras=(), registros=()):
 
     itens, nesta_edicao = [], set()
     for e in entradas:
+        if limite > 0 and len(itens) >= limite:
+            break
         if e["url"] in nesta_edicao:      # mesmo link duas vezes (fila + CLI): publica uma vez
             baixa(e)
             continue
