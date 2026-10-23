@@ -61,6 +61,8 @@ class FeatureTests(unittest.TestCase):
         self.assertIn("p { text-align: justify; margin: 0; text-indent: 1.25em; }", CSS)
         self.assertIn("h1 + p", CSS)
         self.assertIn("break-inside: avoid", CSS)
+        self.assertIn(".abertura-coluna", CSS)
+        self.assertIn(".ponte-transicao", CSS)
 
     def test_limpar_generico_higieniza_br_e_paragrafos(self):
         from src.feeds import limpar_generico

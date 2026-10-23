@@ -11,8 +11,9 @@ from .config import resolver_caminho
 from .epub_builder import montar_epub
 from .escolha import coletar_escolhas, consumir_fila
 from .feeds import coletar_noticias
+from .fofocas import obter_secao_fofocas, validar_config as validar_fofocas_config
 from .historico import caminho_historico, carregar_historico, salvar_historico
-from .itens import item_almanaque, item_curiosidade, item_editor, item_externo
+from .itens import item_almanaque, item_curiosidade, item_editor, item_externo, item_fofocas
 from .layout import ErroLayout, fontes_usadas, montar_secoes, resolver_layout
 from .lastfm import priorizar_artigos_musica, validar_config as validar_lastfm_config
 from .letterboxd import priorizar_artigo, validar_config as validar_letterboxd_config
@@ -107,6 +108,7 @@ def coletar_secao_dw(sessao, cfg, usados_urls, agora):
 
 def gerar_edicao(sessao, cfg, semente=None, usar_hist=True, escolhas=()):
     validar_arquivo_config(cfg.get("arquivo_morto"))
+    validar_fofocas_config(cfg.get("fofocas"))
     # Layout primeiro: qualquer erro de configuração falha antes de qualquer requisição de rede.
     try:
         layout = resolver_layout(cfg)
@@ -213,6 +215,21 @@ def gerar_edicao(sessao, cfg, semente=None, usar_hist=True, escolhas=()):
             coletado["almanaque"] = [item_almanaque(almanaque)]
         else:
             motivos.setdefault("almanaque", "sem dados na janela")
+    fofocas = None
+    if "fofocas" in usadas:
+        fcfg = cfg.get("fofocas") or {}
+        if fcfg.get("habilitado", True):
+            print("\n[Tribunal do Cotidiano] coletando...")
+            fofocas = obter_secao_fofocas(cfg, registros, sessao=sessao)
+        else:
+            motivos["fofocas"] = "desativada"
+        if fofocas and fofocas.casos:
+            coletado["fofocas"] = [item_fofocas(fofocas)]
+            novos += [{"tipo": "fofoca", "id": caso.id, "titulo": caso.titulo,
+                       "data": hoje.isoformat()}
+                      for caso in fofocas.casos]
+        else:
+            motivos.setdefault("fofocas", "sem casos elegíveis ou falha de rede")
     novos += [{"tipo": "escolha", "url": it["url"], "titulo": it["titulo"], "fonte": it["fonte"],
                "data": hoje.isoformat(), **({"pageid": it["pageid"]} if "pageid" in it else {})}
               for it in escolha_itens]
@@ -254,7 +271,8 @@ def gerar_edicao(sessao, cfg, semente=None, usar_hist=True, escolhas=()):
 
     print(f"\nEpub gerado: {destino}  ({len(escolha_itens)} escolha(s) do editor, {len(noticias)} notícias, "
           f"{len(artigos)} curiosidades, {len(dw)} da DW, "
-          f"{1 if almanaque else 0} Almanaque)")
+          f"{1 if almanaque else 0} Almanaque, "
+          f"{len(fofocas.casos) if fofocas else 0} Fofocas)")
     print(f"Capa: semente {info_capa['semente']}, {info_capa['niveis']} níveis, "
           f"{info_capa['faixas_cinza']} faixas de cinza")
     print(resumo_texto(secoes, filtro_qualidade.relatorio()))

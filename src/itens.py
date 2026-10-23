@@ -167,3 +167,66 @@ def item_almanaque(alm):
         "credito": credito,
         "nota": "",
     }
+
+
+def item_fofocas(secao):
+    """Transforma a estrutura SecaoFofocas em um único item uniforme para o capítulo."""
+    partes = []
+    if secao.abertura_editorial_pt:
+        partes.append(
+            f'<p class="abertura-coluna"><em>{html.escape(secao.abertura_editorial_pt)}</em></p>'
+        )
+
+    for i, c in enumerate(secao.casos, 1):
+        if i > 1 and secao.ponte_transicao_pt:
+            partes.append(
+                f'<p class="ponte-transicao"><em>{html.escape(secao.ponte_transicao_pt)}</em></p>'
+            )
+
+        num_str = f"{i:02d}"
+        autor = html.escape(c.autor)
+        titulo = html.escape(c.titulo)
+
+        partes.append(
+            f'<div class="caso-aita">'
+            f'<h2>CASO Nº {num_str} · Depoimento de u/{autor}</h2>'
+            f'<h3>&ldquo;{titulo}&rdquo;</h3>'
+            f'<div lang="en">{c.corpo_html}</div>'
+            f'<h4>SENTENÇA DO JÚRI POPULAR</h4>'
+            f'<p><strong>Veredito:</strong> {html.escape(c.veredito_pt)}</p>'
+            f'<p><em>{html.escape(c.subtitulo_veredito_pt)}</em></p>'
+        )
+
+        if c.comentario_autor and c.comentario_corpo_html:
+            c_autor = html.escape(c.comentario_autor)
+            c_score = c.comentario_score or 0
+            corpo_comentario = c.comentario_corpo_html.strip()
+            if corpo_comentario.startswith("<p>") and corpo_comentario.endswith("</p>"):
+                corpo_comentario = f"<p>&ldquo;{corpo_comentario[3:-4]}&rdquo;</p>"
+            else:
+                corpo_comentario = f"<p>&ldquo;{corpo_comentario}&rdquo;</p>"
+            partes.append(
+                f'<p><strong>Voz do Júri (u/{c_autor} · {c_score} votos):</strong></p>'
+                f'<blockquote lang="en">{corpo_comentario}</blockquote>'
+            )
+
+        partes.append(
+            f'<p>&mdash; <strong>Martelo batido:</strong> {html.escape(c.frase_martelo_pt)}</p>'
+            f'</div>'
+        )
+
+    credito = 'Fonte: <a href="https://www.reddit.com/r/AmItheAsshole/">Reddit · r/AmItheAsshole</a>'
+    return {
+        "fonte_id": "fofocas",
+        "fonte": "Reddit · r/AmItheAsshole",
+        "rotulo": "Coluna de Fofocas",
+        "titulo": secao.titulo_coluna,
+        "titulo_toc": secao.titulo_coluna,
+        "url": "https://www.reddit.com/r/AmItheAsshole/",
+        "html": "".join(partes),
+        "lang": "pt",
+        "data": "",
+        "imagem": None,
+        "credito": credito,
+        "nota": "",
+    }

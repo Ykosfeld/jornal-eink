@@ -253,6 +253,32 @@ almanaque:
     Arte: [pintor, pintora, escultor, escultora, artista plastico, arquiteto, fotografo]
     Cinema: [cineasta, diretor de cinema, ator, atriz, filme, roteirista, cinema]
 
+# Coluna semanal de fofocas e dilemas morais (r/AmItheAsshole)
+fofocas:
+  habilitado: true
+  titulo_coluna: "Tribunal do Cotidiano"
+  subreddit: "AmItheAsshole"
+  periodo: "week"                  # day, week, month
+  limite_busca: 100                # Posts inspecionados na API
+  quantidade_posts: 2              # 1 ou 2 casos por edição
+  forcar_vereditos_diferentes: true
+  filtrar_nsfw: false              # Se true, ignora posts com over_18 == true
+  incluir_top_comment: true
+  max_palavras_comentario: 140
+  palavras_min: 150
+  palavras_max: 750
+  palavras_ideal_min: 250
+  palavras_ideal_max: 450
+  pesos:
+    engajamento: 0.45
+    polemica: 0.35
+    tamanho: 0.20
+  multiplicadores_flair:
+    "Asshole": 1.35
+    "Everyone Sucks": 1.30
+    "No A-holes here": 1.15
+    "Not the A-hole": 1.00
+
 # ---------------------------------------------------------------------------
 # Layout do jornal: seções (colunas) × fontes. ACRESCENTAR ao final do config.yaml.
 # Fontes válidas: qualquer chave de `temas:` + as reservadas: editor, noticias, dw, almanaque (letterboxd: futuro).
@@ -290,6 +316,8 @@ secoes:
      fontes: [Computação, Video games]
    - nome: Deutsch üben
      fontes: [dw]
+   - nome: Tribunal do Cotidiano
+     fontes: [fofocas]
  
 # Relatório JSON de cada edição (seções, itens por fonte, fontes sem item).
 # Fica FORA de `saida` por padrão, para não aparecer no catálogo OPDS. Caminho relativo = raiz do repo.

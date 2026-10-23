@@ -45,6 +45,14 @@ table { font-size: 0.85em; border-collapse: collapse; margin: 0.8em 0; page-brea
 td { padding: 0.2em 1em 0.2em 0; vertical-align: top; }
 small { font-size: 0.8em; }
 math, .mwe-math-element { font-size: 1em; page-break-inside: avoid; break-inside: avoid; }
+
+/* Coluna de Fofocas — Tribunal do Cotidiano */
+.abertura-coluna { font-style: italic; margin: 0.8em 0 1.5em; padding-bottom: 0.8em; border-bottom: 1px solid #000; text-indent: 0; }
+.caso-aita { margin: 1.5em 0; }
+.caso-aita h2 { font-size: 1.15em; margin: 1.2em 0 0.3em; text-indent: 0; }
+.caso-aita h3 { font-size: 1.05em; font-style: italic; margin: 0.3em 0 0.8em; text-indent: 0; }
+.caso-aita h4 { font-size: 0.95em; text-transform: uppercase; letter-spacing: 0.05em; margin: 1em 0 0.3em; text-indent: 0; }
+.ponte-transicao { font-style: italic; margin: 1.2em 0; text-indent: 0; }
 """
 
 

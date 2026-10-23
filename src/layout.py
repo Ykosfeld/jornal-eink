@@ -3,7 +3,7 @@ import difflib
 from itertools import zip_longest
 
 # Fontes que não são temas da Wikipédia. Não podem ser usadas como nome de tema.
-RESERVADAS = ("noticias", "dw", "editor", "letterboxd", "almanaque", "lastfm")
+RESERVADAS = ("noticias", "dw", "editor", "letterboxd", "almanaque", "lastfm", "fofocas")
 ORDENS = ("sequencial", "intercalar")
 
 
@@ -96,13 +96,18 @@ def validar_layout(cfg, secoes):
 
 
 def resolver_layout(cfg):
-    """Resolve e valida `secoes`; garante a seção Almanaque ao final se omitida."""
+    """Resolve e valida `secoes`; garante as seções Almanaque e Fofocas (se habilitada) ao final se omitidas."""
     bruto = cfg.get("secoes")
     if bruto is None:
         bruto = layout_padrao(cfg)
     secoes = validar_layout(cfg, bruto)
     if "almanaque" not in fontes_usadas(secoes):
         secoes.append({"nome": "Almanaque", "fontes": ["almanaque"],
+                       "ordem": "sequencial", "divisoria": None})
+    fcfg = cfg.get("fofocas")
+    if fcfg and fcfg.get("habilitado", True) and "fofocas" not in fontes_usadas(secoes):
+        titulo_coluna = fcfg.get("titulo_coluna", "Tribunal do Cotidiano")
+        secoes.append({"nome": titulo_coluna, "fontes": ["fofocas"],
                        "ordem": "sequencial", "divisoria": None})
     return secoes
 
